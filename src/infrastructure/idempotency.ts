@@ -10,6 +10,8 @@
  * - Duplicate request: Cached response returned immediately without re-processing
  * - TTL: 24 hours (after which key can be reused)
  *
+ * This service is part of the ML-API unified edge-native API for Memory Locks.
+ *
  * @example
  * ```typescript
  * const service = new IdempotencyService(db);

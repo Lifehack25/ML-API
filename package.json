@@ -1,0 +1,26 @@
+{
+  "name": "ml-api",
+  "version": "0.1.0",
+  "description": "Memory Locks edge-native API powered by Hono and Cloudflare Workers.",
+  "private": true,
+  "scripts": {
+    "dev": "wrangler dev src/index.ts --local",
+    "build": "wrangler deploy src/index.ts --dry-run --outdir dist",
+    "deploy": "wrangler deploy src/index.ts",
+    "test": "vitest run",
+    "test:watch": "vitest watch",
+    "lint": "tsc --noEmit"
+  },
+  "dependencies": {
+    "hashids": "^2.3.0",
+    "hono": "^4.3.6",
+    "jose": "^5.3.0",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^4.20241011.0",
+    "typescript": "^5.4.5",
+    "vitest": "^1.6.0",
+    "wrangler": "^3.80.0"
+  }
+}

@@ -3,7 +3,7 @@ import { Logger } from "../../common/logger";
 import { CreateUserRequest } from "../dtos/users";
 import { withTransaction } from "../../data/transaction";
 
-export interface ExternalUserInfo {
+export interface OAuthUserInfo {
   provider: string;
   providerId: string;
   email?: string | null;
@@ -11,14 +11,14 @@ export interface ExternalUserInfo {
   emailVerified?: boolean;
 }
 
-export class ExternalUserLinkService {
+export class OAuthUserLinkService {
   constructor(
     private readonly db: D1Database,
     private readonly userRepository: UserRepository,
     private readonly logger: Logger
   ) {}
 
-  async findOrCreate(info: ExternalUserInfo): Promise<number> {
+  async findOrCreate(info: OAuthUserInfo): Promise<number> {
     return withTransaction(this.db, async (tx) => {
       // Step 1: try provider mapping (within transaction)
       const existingProvider = await this.userRepository.findByProvider(info.provider, info.providerId, tx);
@@ -69,4 +69,3 @@ export class ExternalUserLinkService {
 
 const capitalize = (value: string): string =>
   value.length === 0 ? value : value[0].toUpperCase() + value.slice(1);
-

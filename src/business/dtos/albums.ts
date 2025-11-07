@@ -1,17 +1,16 @@
 export interface AlbumMedia {
-  id: number;
-  cloudflareId: string;
-  isImage: boolean;
-  url: string;
-  thumbnailUrl: string | null;
-  isMainImage: boolean;
-  displayOrder: number;
-  durationSeconds: number | null;
+  Id: number;
+  IsImage: boolean;
+  Url: string;
+  ThumbnailUrl: string | null;
+  IsMainImage: boolean;
+  DisplayOrder: number;
+  DurationSeconds: number | null;
 }
 
 export interface AlbumResponse {
-  albumTitle: string;
-  sealDate: string | null;
-  media: AlbumMedia[];
+  AlbumTitle: string;
+  SealDate: string | null;
+  Media: AlbumMedia[];
 }
 

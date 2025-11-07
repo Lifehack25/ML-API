@@ -12,7 +12,7 @@ import {
   UploadMediaPayload,
   ValidationData,
 } from "../dtos/locks";
-import { MediaService } from "./media-service";
+import { ManageMediaService } from "./manage-media-service";
 
 const formatDateOnly = (date: Date) => date.toISOString().split("T")[0];
 
@@ -20,7 +20,7 @@ export class LockService {
   constructor(
     private readonly lockRepository: LockRepository,
     private readonly mediaRepository: MediaObjectRepository,
-    private readonly mediaService: MediaService,
+    private readonly mediaService: ManageMediaService,
     private readonly hashids: HashIdHelper,
     private readonly logger: Logger
   ) {}
@@ -116,26 +116,6 @@ export class LockService {
   async updateAlbumTitle(lockId: number, albumTitle: string) {
     const updated = await this.lockRepository.update(lockId, { album_title: albumTitle });
     return success(mapLockRowToSummary(updated, this.hashids), "Album title updated");
-  }
-
-  decodeHashedLockId(identifier: string): number | null {
-    return this.hashids.decode(identifier);
-  }
-
-  encodeLockId(id: number): string {
-    return this.hashids.encode(id);
-  }
-
-  async getLock(lockId: number) {
-    return this.lockRepository.findById(lockId);
-  }
-
-  async getMediaRepository() {
-    return this.mediaRepository;
-  }
-
-  async getMediaForLock(lockId: number) {
-    return this.mediaService.getAlbumMedia(lockId);
   }
 
 }

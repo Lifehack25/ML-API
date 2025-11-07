@@ -22,7 +22,7 @@ import {
 
 const MAX_IMAGE_BYTES = 15_728_640; // 15 MB
 
-export class MediaService {
+export class ManageMediaService {
   constructor(
     private readonly mediaRepository: MediaObjectRepository,
     private readonly lockRepository: LockRepository,
@@ -211,6 +211,7 @@ export class MediaService {
     }
   }
 
+  // Publish the metadata of the media
   async publishMetadata(request: PublishMetadataRequest): Promise<ServiceResult<PublishResult>> {
     const { lockId, changes, albumTitle } = request;
 

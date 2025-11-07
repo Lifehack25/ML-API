@@ -1,79 +1,74 @@
-import { DurableObject } from "cloudflare:workers";
+// KV-based Rate Limiting Service
 
-/**
- * Rate limiting state for a single key (IP, user, etc.)
- */
-interface RateLimitState {
+export interface RateLimitResult {
+  allowed: boolean;
   count: number;
   resetTime: number;
+  remaining: number;
 }
 
-/**
- * Durable Object that handles rate limiting for a specific key.
- * Each instance tracks requests for one unique identifier (IP, user ID, etc.)
- * and provides distributed, consistent rate limiting across all edge locations.
- */
-export class RateLimiter extends DurableObject {
+export class RateLimitService {
+  constructor(private kv: KVNamespace) {}
+
   /**
    * Check if a request should be allowed based on rate limit configuration.
-   * Returns the current state after incrementing the counter.
    *
+   * @param key - Unique identifier (e.g., "ip:1.2.3.4", "user:123")
    * @param windowMs - Time window in milliseconds
    * @param maxRequests - Maximum requests allowed in the window
-   * @returns Object with allowed status and current state
+   * @returns Result with allowed status and current state
    */
-  async checkLimit(
-    windowMs: number,
-    maxRequests: number
-  ): Promise<{ allowed: boolean; count: number; resetTime: number; remaining: number }> {
+  async checkLimit(key: string, windowMs: number, maxRequests: number): Promise<RateLimitResult> {
     const now = Date.now();
+    const windowStart = Math.floor(now / windowMs) * windowMs;
+    const resetTime = windowStart + windowMs;
 
-    // Get current state from storage
-    const stateData = await this.ctx.storage.get<RateLimitState>("state");
-    let state: RateLimitState;
+    // Build KV key: ratelimit:{identifier}:{windowStart}
+    const kvKey = this.buildKvKey(key, windowStart);
 
-    if (!stateData || now >= stateData.resetTime) {
-      // Create new window
-      state = {
-        count: 1,
-        resetTime: now + windowMs,
-      };
-    } else {
-      // Increment existing window
-      state = {
-        count: stateData.count + 1,
-        resetTime: stateData.resetTime,
-      };
-    }
+    // Get current count (optimistic read)
+    const currentCount = await this.kv.get(kvKey);
+    const count = currentCount ? parseInt(currentCount, 10) + 1 : 1;
 
-    // Save updated state
-    await this.ctx.storage.put("state", state);
+    // Check if limit would be exceeded
+    const allowed = count <= maxRequests;
+    const remaining = Math.max(0, maxRequests - count);
 
-    const remaining = Math.max(0, maxRequests - state.count);
-    const allowed = state.count <= maxRequests;
+    // Store updated count with TTL (windowMs + 60s buffer for cleanup)
+    const ttlSeconds = Math.ceil((windowMs + 60000) / 1000);
+    await this.kv.put(kvKey, count.toString(), {
+      expirationTtl: ttlSeconds,
+    });
 
     return {
       allowed,
-      count: state.count,
-      resetTime: state.resetTime,
+      count,
+      resetTime,
       remaining,
     };
   }
 
   /**
-   * Reset the rate limit state for this key.
-   * Useful for testing or manual intervention.
+   * Reset the rate limit for a specific key (useful for testing).
+   *
+   * @param key - Unique identifier to reset
    */
-  async reset(): Promise<void> {
-    await this.ctx.storage.delete("state");
+  async reset(key: string, windowMs: number): Promise<void> {
+    const now = Date.now();
+    const windowStart = Math.floor(now / windowMs) * windowMs;
+    const kvKey = this.buildKvKey(key, windowStart);
+    await this.kv.delete(kvKey);
   }
 
   /**
-   * Get current state without incrementing counter.
-   * Useful for monitoring and debugging.
+   * Build KV key from identifier and window start.
+   * Format: ratelimit:{identifier}:{windowStart}
+   *
+   * @param key - Unique identifier (e.g., "ip:1.2.3.4")
+   * @param windowStart - Unix timestamp of window start
+   * @returns KV key string
    */
-  async getState(): Promise<RateLimitState | null> {
-    const state = await this.ctx.storage.get<RateLimitState>("state");
-    return state ?? null;
+  private buildKvKey(key: string, windowStart: number): string {
+    return `ratelimit:${key}:${windowStart}`;
   }
 }

@@ -14,14 +14,15 @@ import { UserRepository } from "../data/repositories/user-repository";
 import { LockRepository } from "../data/repositories/lock-repository";
 import { MediaObjectRepository } from "../data/repositories/media-object-repository";
 import { CleanupJobRepository } from "../data/repositories/cleanup-job-repository";
-import { MediaService } from "../business/services/media-service";
+import { ManageMediaService } from "../business/services/manage-media-service";
 import { LockService } from "../business/services/lock-service";
-import { UserSessionService } from "../business/services/user-session-service";
-import { ExternalUserLinkService } from "../business/services/external-user-link-service";
+import { SessionTokenService } from "../business/services/session-token-service";
+import { OAuthUserLinkService } from "../business/services/oauth-user-link-service";
 import { NotificationService } from "../business/services/notification-service";
-import { AlbumService } from "../business/services/album-service";
-import { AuthService } from "../business/services/auth-service";
+import { ViewAlbumService } from "../business/services/view-album-service";
+import { UserAuthFlowService } from "../business/services/user-auth-flow-service";
 import { UserService } from "../business/services/user-service";
+import { ScanCounterService } from "../business/services/scan-counter-service";
 import type { Logger } from "./logger";
 
 export interface ServiceContainer {
@@ -37,11 +38,12 @@ export interface ServiceContainer {
     cleanupJobs: CleanupJobRepository;
   };
   services: {
-    auth: AuthService;
+    auth: UserAuthFlowService;
     users: UserService;
     locks: LockService;
-    albums: AlbumService;
+    albums: ViewAlbumService;
     notifications: NotificationService;
+    scanCounter: ScanCounterService;
   };
 }
 
@@ -49,6 +51,7 @@ export interface AppVariables {
   container: ServiceContainer;
   userId?: number;
   requestId?: string;
+  executionCtx?: ExecutionContext;
 }
 
 export const createRequestContext = (
@@ -73,9 +76,9 @@ export const createRequestContext = (
   const cleanupJobRepository = new CleanupJobRepository(env.DB);
 
   const hashHelper = createHashIdHelper(config.hashids);
-  const idempotencyService = new IdempotencyService(env.DB);
+  const idempotencyService = new IdempotencyService(env.IDEMPOTENCY_KEYS);
 
-  const mediaService = new MediaService(
+  const mediaService = new ManageMediaService(
     mediaRepository,
     lockRepository,
     cleanupJobRepository,
@@ -99,25 +102,30 @@ export const createRequestContext = (
     logger
   );
 
-  const albumService = new AlbumService(
+  const scanCounterService = new ScanCounterService(
+    lockRepository,
+    notificationService,
+    logger
+  );
+
+  const albumService = new ViewAlbumService(
     lockRepository,
     mediaRepository,
     lockService,
-    notificationService,
     hashHelper,
     logger
   );
 
-  const userSessionService = new UserSessionService(jwtService, userRepository, logger);
-  const externalUserLinkService = new ExternalUserLinkService(env.DB, userRepository, logger);
+  const sessionTokenService = new SessionTokenService(jwtService, userRepository, logger);
+  const oauthUserLinkService = new OAuthUserLinkService(env.DB, userRepository, logger);
 
-  const authService = new AuthService(
+  const authService = new UserAuthFlowService(
     env.DB,
     userRepository,
     twilioClient,
     jwtService,
-    userSessionService,
-    externalUserLinkService,
+    sessionTokenService,
+    oauthUserLinkService,
     appleVerifier,
     googleVerifier,
     logger
@@ -151,6 +159,7 @@ export const createRequestContext = (
       locks: lockService,
       albums: albumService,
       notifications: notificationService,
+      scanCounter: scanCounterService,
     },
   };
 };

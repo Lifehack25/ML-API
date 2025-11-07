@@ -31,11 +31,11 @@ The codebase follows a strict three-tier architecture:
 
 ### 2. Business Layer (`src/business/`)
 - **Services** (`services/`): Domain services containing all application logic
-  - `AuthService`: Authentication, OAuth (Apple/Google), phone verification
+  - `UserAuthFlowService`: Authentication, OAuth (Apple/Google), phone verification
   - `UserService`: User management operations
   - `LockService`: Lock provisioning, unlocking, metadata changes
-  - `AlbumService`: Album CRUD and media attachment
-  - `MediaService`: Media upload, moderation, Cloudflare Images/Stream
+  - `ViewAlbumService`: Album CRUD and media attachment
+  - `ManageMediaService`: Media upload, moderation, Cloudflare Images/Stream
   - `NotificationService`: FCM push notifications
 - **DTOs** (`dtos/`): Request/response contracts in PascalCase (API format)
 - **Errors** (`errors.ts`): Domain-specific error classes (NotFoundError, ValidationError, etc.)

@@ -19,9 +19,9 @@ const defaultOptions: Required<RetryOptions> = {
  * Matches the behavior of ASP.NET Core's RetryHelper.ExecuteWithRetryAsync.
  */
 export async function executeWithRetry<T>(
-  operation: () => Promise<T>,
-  options: RetryOptions = {},
-  logger?: Logger
+    operation: () => Promise<T>,
+    options: RetryOptions = {},
+    logger?: Logger
 ): Promise<T> {
   const opts = { ...defaultOptions, ...options };
   let lastError: Error | unknown;

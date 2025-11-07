@@ -2,26 +2,23 @@
  * Idempotency Service
  *
  * Provides request deduplication to prevent duplicate operations when clients retry requests.
- * Uses D1 database for strongly consistent idempotency key storage with 24-hour TTL.
+ * Uses Cloudflare KV for idempotency key storage with 15-minute TTL.
  *
  * Implementation strategy:
  * - Client supplies Idempotency-Key header (or system generates UUID)
- * - First request: Key reserved in DB, request processed, response cached
+ * - First request: Request processed, response cached in KV
  * - Duplicate request: Cached response returned immediately without re-processing
- * - TTL: 24 hours (after which key can be reused)
+ * - TTL: 15 minutes (after which key expires automatically)
  *
  * This service is part of the ML-API unified edge-native API for Memory Locks.
  *
  * @example
  * ```typescript
- * const service = new IdempotencyService(db);
+ * const service = new IdempotencyService(kv);
  *
  * // Check for existing result
  * const existing = await service.checkIdempotency(key, endpoint);
  * if (existing) return existing; // Return cached response
- *
- * // Reserve key before processing
- * await service.reserveKey(key, endpoint, userId);
  *
  * // Process request...
  * const result = await processRequest();
@@ -31,88 +28,40 @@
  * ```
  */
 
-export interface IdempotencyRecord {
-  idempotencyKey: string;
-  endpoint: string;
-  userId: number | null;
-  responseStatus: number;
-  responseBody: string;
-  createdAt: string;
-  expiresAt: string;
-}
-
 export interface CachedResponse {
   status: number;
   body: unknown;
 }
 
+interface StoredValue {
+  status: number;
+  body: unknown;
+}
+
 export class IdempotencyService {
-  constructor(private db: D1Database) {}
+  private static readonly TTL_SECONDS = 900; // 15 minutes
+
+  constructor(private kv: KVNamespace) {}
 
   /**
    * Check if an idempotency key already exists and return cached response if found.
    *
    * @param key - Idempotency key (UUID or client-supplied)
    * @param endpoint - Request endpoint path
-   * @returns Cached response if key exists and not expired, null otherwise
+   * @returns Cached response if key exists, null otherwise
    */
   async checkIdempotency(key: string, endpoint: string): Promise<CachedResponse | null> {
-    const result = await this.db
-      .prepare(
-        `SELECT response_status, response_body, expires_at
-         FROM idempotency_keys
-         WHERE idempotency_key = ? AND endpoint = ?`
-      )
-      .bind(key, endpoint)
-      .first<{ response_status: number; response_body: string; expires_at: string }>();
+    const kvKey = this.buildKvKey(key, endpoint);
+    const cached = await this.kv.get<StoredValue>(kvKey, "json");
 
-    if (!result) {
+    if (!cached) {
       return null;
     }
 
-    // Check expiration
-    const now = new Date();
-    const expiresAt = new Date(result.expires_at);
-    if (now > expiresAt) {
-      // Expired - delete and allow reprocessing
-      await this.db
-        .prepare(`DELETE FROM idempotency_keys WHERE idempotency_key = ? AND endpoint = ?`)
-        .bind(key, endpoint)
-        .run();
-      return null;
-    }
-
-    // Return cached response
     return {
-      status: result.response_status,
-      body: result.response_body ? JSON.parse(result.response_body) : null,
+      status: cached.status,
+      body: cached.body,
     };
-  }
-
-  /**
-   * Reserve an idempotency key before processing the request.
-   * This prevents duplicate processing if concurrent requests arrive.
-   *
-   * @param key - Idempotency key
-   * @param endpoint - Request endpoint path
-   * @param userId - User ID (optional, for auditing)
-   * @throws Error if key already exists (race condition - should retry checkIdempotency)
-   */
-  async reserveKey(key: string, endpoint: string, userId?: number): Promise<void> {
-    const expiresAt = new Date();
-    expiresAt.setHours(expiresAt.getHours() + 24);
-
-    const result = await this.db
-      .prepare(
-        `INSERT INTO idempotency_keys (idempotency_key, endpoint, user_id, expires_at)
-         VALUES (?, ?, ?, ?)`
-      )
-      .bind(key, endpoint, userId ?? null, expiresAt.toISOString())
-      .run();
-
-    if (!result.success) {
-      throw new Error(`Failed to reserve idempotency key: ${key}`);
-    }
   }
 
   /**
@@ -121,21 +70,15 @@ export class IdempotencyService {
    * @param key - Idempotency key
    * @param endpoint - Request endpoint path
    * @param status - HTTP status code
-   * @param body - Response body (will be JSON serialized)
+   * @param body - Response body
    */
   async storeResult(key: string, endpoint: string, status: number, body: unknown): Promise<void> {
-    const result = await this.db
-      .prepare(
-        `UPDATE idempotency_keys
-         SET response_status = ?, response_body = ?, updated_at = CURRENT_TIMESTAMP
-         WHERE idempotency_key = ? AND endpoint = ?`
-      )
-      .bind(status, JSON.stringify(body), key, endpoint)
-      .run();
+    const kvKey = this.buildKvKey(key, endpoint);
+    const value: StoredValue = { status, body };
 
-    if (!result.success) {
-      throw new Error(`Failed to store idempotency result for key: ${key}`);
-    }
+    await this.kv.put(kvKey, JSON.stringify(value), {
+      expirationTtl: IdempotencyService.TTL_SECONDS,
+    });
   }
 
   /**
@@ -145,57 +88,22 @@ export class IdempotencyService {
    * @param endpoint - Request endpoint path
    */
   async deleteKey(key: string, endpoint: string): Promise<void> {
-    await this.db
-      .prepare(`DELETE FROM idempotency_keys WHERE idempotency_key = ? AND endpoint = ?`)
-      .bind(key, endpoint)
-      .run();
+    const kvKey = this.buildKvKey(key, endpoint);
+    await this.kv.delete(kvKey);
   }
 
   /**
-   * Clean up expired idempotency keys.
-   * Should be called periodically (e.g., via cron trigger).
+   * Build KV key from idempotency key and endpoint.
+   * Format: idempotency:{endpoint}:{key}
    *
-   * @param batchSize - Maximum number of keys to delete in one call (default: 1000)
-   * @returns Number of keys deleted
+   * @param key - Idempotency key
+   * @param endpoint - Request endpoint path
+   * @returns KV key string
    */
-  async cleanupExpired(batchSize: number = 1000): Promise<number> {
-    const result = await this.db
-      .prepare(
-        `DELETE FROM idempotency_keys
-         WHERE expires_at < datetime('now')
-         LIMIT ?`
-      )
-      .bind(batchSize)
-      .run();
-
-    return result.meta.changes;
-  }
-
-  /**
-   * Get statistics about idempotency key usage (for monitoring).
-   *
-   * @returns Object with total keys, expired keys, and keys by status
-   */
-  async getStats(): Promise<{
-    totalKeys: number;
-    expiredKeys: number;
-    keysWithResponse: number;
-  }> {
-    const stats = await this.db
-      .prepare(
-        `SELECT
-           COUNT(*) as total_keys,
-           SUM(CASE WHEN expires_at < datetime('now') THEN 1 ELSE 0 END) as expired_keys,
-           SUM(CASE WHEN response_body IS NOT NULL THEN 1 ELSE 0 END) as keys_with_response
-         FROM idempotency_keys`
-      )
-      .first<{ total_keys: number; expired_keys: number; keys_with_response: number }>();
-
-    return {
-      totalKeys: stats?.total_keys ?? 0,
-      expiredKeys: stats?.expired_keys ?? 0,
-      keysWithResponse: stats?.keys_with_response ?? 0,
-    };
+  private buildKvKey(key: string, endpoint: string): string {
+    // Normalize endpoint by removing leading slash and replacing slashes with colons
+    const normalizedEndpoint = endpoint.replace(/^\//, "").replace(/\//g, ":");
+    return `idempotency:${normalizedEndpoint}:${key}`;
   }
 }
 

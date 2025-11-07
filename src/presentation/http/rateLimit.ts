@@ -1,5 +1,6 @@
 import type { Context, Next } from "hono";
 import type { EnvBindings } from "../../common/bindings";
+import { RateLimitService } from "../../infrastructure/rateLimit";
 
 export interface RateLimitConfig {
   windowMs: number;
@@ -36,8 +37,8 @@ const defaultHandler = (c: Context): Response =>
   );
 
 /**
- * Creates a rate limiting middleware using Cloudflare Durable Objects.
- * This provides distributed, consistent rate limiting across all edge locations.
+ * Creates a rate limiting middleware using Cloudflare KV.
+ * Provides distributed rate limiting with eventual consistency.
  *
  * @param config - Rate limit configuration
  * @returns Hono middleware handler
@@ -57,14 +58,11 @@ export const rateLimit = (config: RateLimitConfig) => {
     // Generate unique key for this client (IP, user ID, etc.)
     const key = keyFn(c);
 
-    // Get Durable Object ID from the key (consistent hashing)
-    const id = env.RATE_LIMITER.idFromName(key);
+    // Create rate limit service with KV binding
+    const rateLimitService = new RateLimitService(env.RATE_LIMIT);
 
-    // Get stub to the Durable Object instance
-    const stub = env.RATE_LIMITER.get(id) as any;
-
-    // Check rate limit by calling the Durable Object
-    const result = await stub.checkLimit(config.windowMs, config.maxRequests);
+    // Check rate limit
+    const result = await rateLimitService.checkLimit(key, config.windowMs, config.maxRequests);
 
     // Set rate limit headers for client visibility
     c.header("X-RateLimit-Limit", config.maxRequests.toString());
@@ -85,18 +83,36 @@ export const rateLimit = (config: RateLimitConfig) => {
  * Use these for consistent rate limiting across the API.
  */
 export const rateLimiters = {
-  /** 10 requests per minute - for media uploads */
-  mediaUpload: rateLimit({ windowMs: 60_000, maxRequests: 10 }),
+  // Authentication - Split by abuse risk level
+  /** 5 requests per 5 minutes - for sending verification codes (prevent SMS bombing) */
+  authSendCode: rateLimit({ windowMs: 300_000, maxRequests: 5 }),
 
-  /** 60 requests per minute - for general API endpoints */
-  api: rateLimit({ windowMs: 60_000, maxRequests: 60 }),
+  /** 15 requests per 5 minutes - for verifying codes (allow retry on typos) */
+  authVerify: rateLimit({ windowMs: 300_000, maxRequests: 15 }),
 
-  /** 120 requests per minute - for read-heavy endpoints */
-  read: rateLimit({ windowMs: 60_000, maxRequests: 120 }),
+  /** 10 requests per minute - for OAuth verification (low risk, externally validated) */
+  authOAuth: rateLimit({ windowMs: 60_000, maxRequests: 10 }),
 
-  /** 5 requests per minute - for expensive batch operations */
+  // Token operations
+  /** 10 requests per minute - for token refresh (should be ~1 per 2 hours normally) */
+  tokenRefresh: rateLimit({ windowMs: 60_000, maxRequests: 10 }),
+
+  // Media operations
+  /** 120 requests per 5 minutes - for media uploads (allows full Tier 2 album of 100 images + retries) */
+  mediaUpload: rateLimit({ windowMs: 300_000, maxRequests: 120 }),
+
+  // General API - Split by operation type
+  /** 120 requests per minute - for read operations (cheap, safe) */
+  apiRead: rateLimit({ windowMs: 60_000, maxRequests: 120 }),
+
+  /** 30 requests per minute - for write operations (protect DB) */
+  apiWrite: rateLimit({ windowMs: 60_000, maxRequests: 30 }),
+
+  // Public endpoints
+  /** 300 requests per minute - for public album viewing (support viral growth) */
+  albumRead: rateLimit({ windowMs: 60_000, maxRequests: 300 }),
+
+  // Admin operations
+  /** 5 requests per minute - for batch lock creation (admin only) */
   batch: rateLimit({ windowMs: 60_000, maxRequests: 5 }),
-
-  /** 10 requests per 5 minutes - for auth endpoints (prevent brute force) */
-  auth: rateLimit({ windowMs: 300_000, maxRequests: 10 }),
 };

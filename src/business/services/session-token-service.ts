@@ -9,7 +9,7 @@ interface IssueTokenOptions {
   context?: string;
 }
 
-export class UserSessionService {
+export class SessionTokenService {
   constructor(
     private readonly jwtService: JwtService,
     private readonly userRepository: UserRepository,
@@ -41,4 +41,3 @@ export class UserSessionService {
     };
   }
 }
-

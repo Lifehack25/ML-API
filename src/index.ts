@@ -14,10 +14,6 @@ import { createMediaObjectRoutes } from "./presentation/routes/mediaObjects";
 import { createAlbumRoutes } from "./presentation/routes/albums";
 import { createPushNotificationRoutes } from "./presentation/routes/pushNotifications";
 import { processCleanupJobs } from "./jobs/process-cleanup-jobs";
-import { cleanupExpiredIdempotencyKeys } from "./jobs/cleanup-idempotency";
-
-// Export Durable Object for Cloudflare Workers runtime
-export { RateLimiter } from "./infrastructure/rateLimit";
 
 let appInstance: Hono<{ Bindings: EnvBindings; Variables: AppVariables }> | null = null;
 let cachedConfig: AppConfig | null = null;
@@ -30,6 +26,7 @@ const buildApp = (config: AppConfig) => {
     const container: ServiceContainer = createRequestContext(c.env, requestId, config);
     c.set("container", container);
     c.set("requestId", requestId);
+    c.set("executionCtx", c.executionCtx);
     await next();
   });
 
@@ -39,7 +36,6 @@ const buildApp = (config: AppConfig) => {
       origin: (origin) => {
         if (!origin) return "*";
 
-        // Allow specific web origins for browser-based clients
         const allowedOrigins = [
           "https://album.memorylocks.com",
           // Allow localhost in development for testing
@@ -97,10 +93,7 @@ export default {
 
   async scheduled(event: ScheduledEvent, env: EnvBindings, ctx: ExecutionContext) {
     try {
-      if (event.cron === "0 2 * * *") {
-        // Daily at 2 AM UTC: cleanup expired idempotency keys
-        await cleanupExpiredIdempotencyKeys(env.DB);
-      } else if (event.cron === "*/15 * * * *") {
+      if (event.cron === "*/15 * * * *") {
         // Every 15 minutes: process Cloudflare cleanup jobs
         await processCleanupJobs(env, ctx);
       }

@@ -17,6 +17,7 @@ import type {
 import { MetadataChangeType } from "../../business/dtos/locks";
 import { mapLockRowToSummary } from "../../data/mappers/lock-mapper";
 import { requireNumericParam, validateJson } from "../http/validation";
+import { invalidateAlbumCache } from "../../infrastructure/cache-invalidation";
 
 const ensureLockOwnership = async (c: Context<{ Bindings: EnvBindings; Variables: AppVariables }>, lockId: number): Promise<true | Response> => {
   const userId = getUserId(c);
@@ -68,6 +69,7 @@ export const createLockRoutes = (config: AppConfig) => {
   // Get all locks owned by the authenticated user.
   router.get(
     "/user/:userId{[0-9]+}",
+    rateLimiters.apiRead,
     jwtMiddleware,
     attachUser,
     requireNumericParam("userId", { min: 1, message: "Invalid user ID" }),
@@ -86,6 +88,7 @@ export const createLockRoutes = (config: AppConfig) => {
   // Update the name of a lock.
   router.patch(
     "/name",
+    rateLimiters.apiWrite,
     jwtMiddleware,
     attachUser,
     validateJson(updateNameSchema),
@@ -103,6 +106,7 @@ export const createLockRoutes = (config: AppConfig) => {
   // Toggle the seal date for a lock.
   router.patch(
     "/:lockId{[0-9]+}/seal",
+    rateLimiters.apiWrite,
     jwtMiddleware,
     attachUser,
     requireNumericParam("lockId", { min: 1, message: "Invalid lock ID" }),
@@ -120,6 +124,7 @@ export const createLockRoutes = (config: AppConfig) => {
   // Upgrade lock storage tier using a path parameter.
   router.patch(
     "/upgrade-storage/:lockId{[0-9]+}",
+    rateLimiters.apiWrite,
     jwtMiddleware,
     attachUser,
     requireNumericParam("lockId", { min: 1, message: "Invalid lock ID" }),
@@ -141,6 +146,7 @@ export const createLockRoutes = (config: AppConfig) => {
   // Link a scanned lock to the current user by hashed ID.
   router.post(
     "/connect/user",
+    rateLimiters.apiWrite,
     jwtMiddleware,
     attachUser,
     validateJson(connectLockSchema),
@@ -159,6 +165,7 @@ export const createLockRoutes = (config: AppConfig) => {
   router.post(
     "/publish",
     idempotencyMiddleware,
+    rateLimiters.apiWrite,
     jwtMiddleware,
     attachUser,
     validateJson(publishSchema),
@@ -172,6 +179,14 @@ export const createLockRoutes = (config: AppConfig) => {
         return ownership;
       }
       const result = await getContainer(c).services.locks.publishMetadata(payload);
+
+      // Invalidate album cache immediately after successful publish
+      if (result.ok) {
+        const container = getContainer(c);
+        const hashedId = container.hashids.encode(payload.lockId);
+        await invalidateAlbumCache(hashedId);
+      }
+
       return respondFromService(c, result);
     }
   );
@@ -225,6 +240,7 @@ export const createLockRoutes = (config: AppConfig) => {
   // Retrieve a single lock owned by the current user.
   router.get(
     "/:lockId{[0-9]+}",
+    rateLimiters.apiRead,
     jwtMiddleware,
     attachUser,
     requireNumericParam("lockId", { min: 1, message: "Invalid lock ID" }),
@@ -248,6 +264,7 @@ export const createLockRoutes = (config: AppConfig) => {
   // Provide validation data for upcoming media uploads.
   router.get(
     "/:lockId{[0-9]+}/validation-data",
+    rateLimiters.apiRead,
     jwtMiddleware,
     attachUser,
     requireNumericParam("lockId", { min: 1, message: "Invalid lock ID" }),

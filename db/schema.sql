@@ -32,6 +32,9 @@ CREATE TABLE locks (
 );
 
 -- Media Objects table
+-- Note: display_order allows gaps and duplicates intentionally
+-- The mobile app uses collection index as source of truth and rebuilds
+-- all display_order values on every publish operation
 CREATE TABLE media_objects (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     lock_id INTEGER NOT NULL,
@@ -47,18 +50,6 @@ CREATE TABLE media_objects (
     FOREIGN KEY (lock_id) REFERENCES locks(id) ON DELETE CASCADE
 );
 
--- Idempotency Keys table (for preventing duplicate requests)
-CREATE TABLE idempotency_keys (
-  idempotency_key TEXT NOT NULL,
-  endpoint TEXT NOT NULL,
-  user_id INTEGER,
-  response_status INTEGER,
-  response_body TEXT,
-  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  expires_at DATETIME NOT NULL,
-  PRIMARY KEY (idempotency_key, endpoint)
-);
-
 -- Cloudflare Cleanup Jobs table (for tracking media deletion retries)
 CREATE TABLE cloudflare_cleanup_jobs (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -72,16 +63,6 @@ CREATE TABLE cloudflare_cleanup_jobs (
   updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
--- Failed Registrations table (for tracking Twilio verification successes with DB failures)
-CREATE TABLE failed_registrations (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  identifier TEXT NOT NULL,
-  verification_code TEXT,
-  error_message TEXT,
-  twilio_verified BOOLEAN NOT NULL DEFAULT FALSE,
-  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
-);
-
 -- Create indexes for better performance
 CREATE INDEX idx_users_email ON users(email);
 CREATE INDEX idx_users_phone ON users(phone_number);
@@ -89,9 +70,9 @@ CREATE INDEX idx_users_provider ON users(auth_provider, provider_id);
 CREATE INDEX idx_locks_user_id ON locks(user_id);
 CREATE INDEX idx_media_objects_lock_id ON media_objects(lock_id);
 CREATE INDEX idx_media_objects_display_order ON media_objects(lock_id, display_order);
-CREATE INDEX idx_idempotency_expires ON idempotency_keys(expires_at);
-CREATE INDEX idx_idempotency_user ON idempotency_keys(user_id) WHERE user_id IS NOT NULL;
+
+-- Unique constraint: Only one main image per lock
+-- Partial index only indexes rows where is_main_picture = TRUE
+CREATE UNIQUE INDEX idx_media_one_main_per_lock ON media_objects(lock_id) WHERE is_main_picture = TRUE;
 CREATE INDEX idx_cleanup_jobs_status_retry ON cloudflare_cleanup_jobs(status, next_retry_at);
 CREATE INDEX idx_cleanup_jobs_cloudflare_id ON cloudflare_cleanup_jobs(cloudflare_id);
-CREATE INDEX idx_failed_registrations_identifier ON failed_registrations(identifier);
-CREATE INDEX idx_failed_registrations_created ON failed_registrations(created_at);

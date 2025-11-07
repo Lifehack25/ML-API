@@ -10,19 +10,16 @@ APPLE_BUNDLE_ID = "com.memorylocks.mlmobileapp"
 binding = "DB"
 database_id = "3afe1cf6-4d2c-4461-9b41-1c8e232e8361"
 
-# Durable Objects for distributed rate limiting
-[[durable_objects.bindings]]
-name = "RATE_LIMITER"
-class_name = "RateLimiter"
-script_name = "ml-api"
+[[kv_namespaces]]
+binding = "IDEMPOTENCY_KEYS"
+id = "68c9b0be5f2743eba3b7394948b162e2"
 
-[[migrations]]
-tag = "v1"
-new_sqlite_classes = ["RateLimiter"]
+[[kv_namespaces]]
+binding = "RATE_LIMIT"
+id = "e87dedccbff34b63aa40ba398f2c456d"
 
 # Cron triggers for background jobs
 [triggers]
 crons = [
-  "0 2 * * *",      # Daily at 2 AM UTC: cleanup expired idempotency keys
   "*/15 * * * *"    # Every 15 minutes: process Cloudflare cleanup jobs
 ]

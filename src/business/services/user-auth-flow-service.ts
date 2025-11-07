@@ -14,21 +14,21 @@ import {
   SendCodeRequest,
   VerifyCodeRequest,
 } from "../dtos/users";
-import { UserSessionService } from "./user-session-service";
-import { ExternalUserInfo, ExternalUserLinkService } from "./external-user-link-service";
+import { SessionTokenService } from "./session-token-service";
+import { OAuthUserInfo, OAuthUserLinkService } from "./oauth-user-link-service";
 
 const normalizeEmail = (email: string) => email.trim().toLowerCase();
 
 const sanitizePhone = (phone: string) => phone.replace(/\s+/g, "");
 
-export class AuthService {
+export class UserAuthFlowService {
   constructor(
     private readonly db: D1Database,
     private readonly userRepository: UserRepository,
     private readonly twilioClient: TwilioVerifyClient | null,
     private readonly jwtService: JwtService,
-    private readonly userSessionService: UserSessionService,
-    private readonly externalUserLinkService: ExternalUserLinkService,
+    private readonly sessionTokenService: SessionTokenService,
+    private readonly oauthUserLinkService: OAuthUserLinkService,
     private readonly appleVerifier: AppleVerifier,
     private readonly googleVerifier: GoogleVerifier,
     private readonly logger: Logger
@@ -107,7 +107,7 @@ export class AuthService {
           return failure("USER_NOT_FOUND", "User not found", undefined, 404);
         }
 
-        const tokens = await this.userSessionService.issueTokens(user.id, {
+        const tokens = await this.sessionTokenService.issueTokens(user.id, {
           emailVerified: request.isEmail ? true : undefined,
           phoneVerified: request.isEmail ? undefined : true,
           context: "Login",
@@ -162,7 +162,7 @@ export class AuthService {
         });
 
         // Issue tokens after successful transaction
-        const tokens = await this.userSessionService.issueTokens(created.id, {
+        const tokens = await this.sessionTokenService.issueTokens(created.id, {
           emailVerified: request.isEmail ? true : undefined,
           phoneVerified: request.isEmail ? undefined : true,
           context: "Registration",
@@ -181,18 +181,6 @@ export class AuthService {
           identifier,
           error: errorMsg,
         });
-
-        try {
-          await this.db
-            .prepare(
-              `INSERT INTO failed_registrations (identifier, verification_code, error_message, twilio_verified)
-               VALUES (?, ?, ?, TRUE)`
-            )
-            .bind(identifier, request.verifyCode, errorMsg)
-            .run();
-        } catch (logError) {
-          this.logger.error("Failed to log failed registration", { error: String(logError) });
-        }
 
         return failure("REGISTRATION_FAILED", "Failed to create user account", undefined, 500);
       }
@@ -229,7 +217,7 @@ export class AuthService {
     try {
       const appleInfo = await this.appleVerifier.verifyIdToken(request.idToken);
 
-      const externalInfo: ExternalUserInfo = {
+      const externalInfo: OAuthUserInfo = {
         provider: "apple",
         providerId: appleInfo.appleUserId,
         email: appleInfo.email,
@@ -237,9 +225,9 @@ export class AuthService {
         emailVerified: appleInfo.emailVerified,
       };
 
-      const userId = await this.externalUserLinkService.findOrCreate(externalInfo);
+      const userId = await this.oauthUserLinkService.findOrCreate(externalInfo);
 
-      const tokens = await this.userSessionService.issueTokens(userId, {
+      const tokens = await this.sessionTokenService.issueTokens(userId, {
         emailVerified: appleInfo.emailVerified,
         context: "Apple Sign-In",
       });
@@ -255,7 +243,7 @@ export class AuthService {
     try {
       const googleInfo = await this.googleVerifier.verifyIdToken(request.idToken);
 
-      const externalInfo: ExternalUserInfo = {
+      const externalInfo: OAuthUserInfo = {
         provider: "google",
         providerId: googleInfo.googleUserId,
         email: googleInfo.email,
@@ -263,8 +251,8 @@ export class AuthService {
         emailVerified: googleInfo.emailVerified,
       };
 
-      const userId = await this.externalUserLinkService.findOrCreate(externalInfo);
-      const tokens = await this.userSessionService.issueTokens(userId, {
+      const userId = await this.oauthUserLinkService.findOrCreate(externalInfo);
+      const tokens = await this.sessionTokenService.issueTokens(userId, {
         emailVerified: googleInfo.emailVerified,
         context: "Google Sign-In",
       });
@@ -276,4 +264,3 @@ export class AuthService {
     }
   }
 }
-

@@ -87,6 +87,7 @@ export const createMediaObjectRoutes = (config: AppConfig) => {
   // Update metadata for an existing media object.
   router.patch(
     "/:id{[0-9]+}",
+    rateLimiters.apiWrite,
     jwtMiddleware,
     attachUser,
     requireNumericParam("id", { min: 1, message: "Invalid media ID" }),
@@ -118,6 +119,7 @@ export const createMediaObjectRoutes = (config: AppConfig) => {
   router.delete(
     "/:id{[0-9]+}",
     idempotencyMiddleware,
+    rateLimiters.apiWrite,
     jwtMiddleware,
     attachUser,
     requireNumericParam("id", { min: 1, message: "Invalid media ID" }),
@@ -131,6 +133,7 @@ export const createMediaObjectRoutes = (config: AppConfig) => {
   // Batch update media display order values.
   router.post(
     "/batch-reorder",
+    rateLimiters.apiWrite,
     jwtMiddleware,
     attachUser,
     validateJson(batchReorderSchema),
@@ -144,6 +147,7 @@ export const createMediaObjectRoutes = (config: AppConfig) => {
   // Update the album title for a specific lock.
   router.patch(
     "/locks/:lockId{[0-9]+}/album-title",
+    rateLimiters.apiWrite,
     jwtMiddleware,
     attachUser,
     requireNumericParam("lockId", { min: 1, message: "Invalid lock ID" }),

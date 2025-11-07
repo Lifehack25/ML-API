@@ -33,8 +33,6 @@ export enum MetadataChangeType {
 export interface MetadataChange {
   changeType: MetadataChangeType;
   mediaId?: number | null;
-  cloudflareId?: string | null;
-  isImage?: boolean | null;
   newDisplayOrder?: number | null;
   isMainImage?: boolean | null;
 }

@@ -66,13 +66,13 @@ export const allowPublic = (predicate: (c: Context) => boolean, middleware: Midd
  * Idempotency middleware for preventing duplicate request processing.
  *
  * Checks for existing idempotency key and returns cached response if found.
- * Otherwise, reserves the key, processes the request, and caches the response.
+ * Otherwise, processes the request and caches the response.
  *
  * Key source priority:
  * 1. Idempotency-Key header (client-supplied)
  * 2. Auto-generated UUID v4
  *
- * TTL: 24 hours
+ * TTL: 15 minutes
  *
  * Usage:
  * ```typescript
@@ -96,28 +96,6 @@ export const idempotencyMiddleware: MiddlewareHandler = async (c, next) => {
   if (cached) {
     // Return cached response immediately
     return c.json(cached.body, cached.status);
-  }
-
-  // Extract user ID if available (for auditing)
-  let userId: number | undefined;
-  try {
-    userId = c.get("userId") as number | undefined;
-  } catch {
-    // Not authenticated - fine, userId is optional
-  }
-
-  // Reserve key before processing
-  try {
-    await idempotencyService.reserveKey(key, endpoint, userId);
-  } catch (error) {
-    // Race condition: another request already reserved this key
-    // Re-check for cached result
-    const retryCache = await idempotencyService.checkIdempotency(key, endpoint);
-    if (retryCache) {
-      return c.json(retryCache.body, retryCache.status);
-    }
-    // Still not found - this shouldn't happen, but fail gracefully
-    return fail(c, "Idempotency key conflict", 409);
   }
 
   // Process request

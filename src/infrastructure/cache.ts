@@ -1,11 +1,3 @@
-/**
- * Edge cache utilities using Cloudflare Workers Cache API
- *
- * Provides simple caching functions with TTL support and cache key tracking
- * for invalidation purposes.
- */
-
-import type { KVNamespace } from '@cloudflare/workers-types';
 
 /**
  * Cache configuration options

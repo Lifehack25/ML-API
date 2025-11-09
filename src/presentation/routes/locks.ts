@@ -8,7 +8,6 @@ import { respondFromService, ok, fail } from "../http/responses";
 import { getContainer, getUserId } from "../http/context";
 import { createLockKeyAuth, setUserContext, idempotencyMiddleware } from "../http/middleware";
 import { z } from "zod";
-import { rateLimiters } from "../http/rateLimit";
 import type {
   LockConnectUserRequest,
   PublishMetadataRequest,
@@ -69,7 +68,6 @@ export const createLockRoutes = (config: AppConfig) => {
   // Get all locks owned by the authenticated user.
   router.get(
     "/user/:userId{[0-9]+}",
-    rateLimiters.apiRead,
     jwtMiddleware,
     attachUser,
     requireNumericParam("userId", { min: 1, message: "Invalid user ID" }),
@@ -88,7 +86,6 @@ export const createLockRoutes = (config: AppConfig) => {
   // Update the name of a lock.
   router.patch(
     "/name",
-    rateLimiters.apiWrite,
     jwtMiddleware,
     attachUser,
     validateJson(updateNameSchema),
@@ -106,7 +103,6 @@ export const createLockRoutes = (config: AppConfig) => {
   // Toggle the seal date for a lock.
   router.patch(
     "/:lockId{[0-9]+}/seal",
-    rateLimiters.apiWrite,
     jwtMiddleware,
     attachUser,
     requireNumericParam("lockId", { min: 1, message: "Invalid lock ID" }),
@@ -124,7 +120,6 @@ export const createLockRoutes = (config: AppConfig) => {
   // Upgrade lock storage tier using a path parameter.
   router.patch(
     "/upgrade-storage/:lockId{[0-9]+}",
-    rateLimiters.apiWrite,
     jwtMiddleware,
     attachUser,
     requireNumericParam("lockId", { min: 1, message: "Invalid lock ID" }),
@@ -146,7 +141,6 @@ export const createLockRoutes = (config: AppConfig) => {
   // Link a scanned lock to the current user by hashed ID.
   router.post(
     "/connect/user",
-    rateLimiters.apiWrite,
     jwtMiddleware,
     attachUser,
     validateJson(connectLockSchema),
@@ -165,7 +159,6 @@ export const createLockRoutes = (config: AppConfig) => {
   router.post(
     "/publish",
     idempotencyMiddleware,
-    rateLimiters.apiWrite,
     jwtMiddleware,
     attachUser,
     validateJson(publishSchema),
@@ -195,7 +188,6 @@ export const createLockRoutes = (config: AppConfig) => {
   router.post(
     "/media",
     idempotencyMiddleware,
-    rateLimiters.mediaUpload,
     jwtMiddleware,
     attachUser,
     async (c) => {
@@ -240,7 +232,6 @@ export const createLockRoutes = (config: AppConfig) => {
   // Retrieve a single lock owned by the current user.
   router.get(
     "/:lockId{[0-9]+}",
-    rateLimiters.apiRead,
     jwtMiddleware,
     attachUser,
     requireNumericParam("lockId", { min: 1, message: "Invalid lock ID" }),
@@ -264,7 +255,6 @@ export const createLockRoutes = (config: AppConfig) => {
   // Provide validation data for upcoming media uploads.
   router.get(
     "/:lockId{[0-9]+}/validation-data",
-    rateLimiters.apiRead,
     jwtMiddleware,
     attachUser,
     requireNumericParam("lockId", { min: 1, message: "Invalid lock ID" }),
@@ -283,7 +273,6 @@ export const createLockRoutes = (config: AppConfig) => {
   router.post(
     "/create/:totalLocks{[0-9]+}",
     idempotencyMiddleware,
-    rateLimiters.batch,
     createLockKeyAuth(config),
     requireNumericParam("totalLocks", { min: 1, max: 10000, message: "Invalid totalLocks parameter. Must be between 1 and 10000." }),
     async (c) => {

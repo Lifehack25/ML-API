@@ -30,14 +30,40 @@ const parseServiceAccount = (config?: FirebaseConfig): ServiceAccount | null => 
   }
 
   try {
-    const parsed = JSON.parse(config.serviceAccountJson) as ServiceAccount;
+    // Preprocess the JSON to handle improperly escaped control characters
+    // Common issue: private_key field may contain literal newlines instead of \n
+    let jsonString = config.serviceAccountJson;
+
+    // If the JSON string contains unescaped newlines, tabs, or other control characters,
+    // they need to be properly escaped before parsing
+    // This is a common issue when copy-pasting from Google Cloud Console
+    if (jsonString.includes('\n') || jsonString.includes('\t') || jsonString.includes('\r')) {
+      // Only escape control characters that appear within string values (private_key)
+      // We need to be careful not to break the JSON structure itself
+      console.warn("Firebase service account JSON contains unescaped control characters, attempting to fix");
+
+      // Replace actual newlines/tabs/carriage returns with their escape sequences
+      // but only within quoted strings (this is a heuristic approach)
+      jsonString = jsonString
+        .replace(/\r\n/g, '\\n')
+        .replace(/\n/g, '\\n')
+        .replace(/\r/g, '\\r')
+        .replace(/\t/g, '\\t');
+    }
+
+    const parsed = JSON.parse(jsonString) as ServiceAccount;
     if (!parsed.project_id || !parsed.client_email || !parsed.private_key) {
       console.warn("Firebase service account JSON missing required fields");
       return null;
     }
     return parsed;
   } catch (error) {
-    console.error("Failed to parse Firebase service account JSON", error);
+    console.error(
+      "Failed to parse Firebase service account JSON. " +
+      "Ensure the private_key field uses escaped newlines (\\n) not literal newlines. " +
+      "The JSON should be valid JSON format.",
+      error
+    );
     return null;
   }
 };

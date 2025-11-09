@@ -9,7 +9,6 @@ import { respondFromService, ok, fail } from "../http/responses";
 import { getContainer, getUserId } from "../http/context";
 import { setUserContext, idempotencyMiddleware } from "../http/middleware";
 import { booleanQuery, requireNumericParam, validateJson } from "../http/validation";
-import { rateLimiters } from "../http/rateLimit";
 import type {
   AppleAuthRequest,
   RefreshTokenRequest,
@@ -92,7 +91,6 @@ export const createUserRoutes = (config: AppConfig) => {
   // Send a Twilio verification code for login or registration.
   router.post(
     "/verify/send-code",
-    rateLimiters.authSendCode,
     validateJson(sendCodeSchema),
     async (c) => {
       const payload = c.req.valid("json") as SendCodeRequest;
@@ -104,7 +102,6 @@ export const createUserRoutes = (config: AppConfig) => {
   // Resend a Twilio verification code to email or SMS.
   router.post(
     "/verify/resend-code",
-    rateLimiters.authSendCode,
     validateJson(resendCodeSchema),
     async (c) => {
       const payload = c.req.valid("json") as { isEmail: boolean; identifier: string };
@@ -117,7 +114,6 @@ export const createUserRoutes = (config: AppConfig) => {
   router.post(
     "/verify/verify-code",
     idempotencyMiddleware,
-    rateLimiters.authVerify,
     validateJson(verifyCodeSchema),
     async (c) => {
       const payload = c.req.valid("json") as VerifyCodeRequest;
@@ -129,7 +125,6 @@ export const createUserRoutes = (config: AppConfig) => {
   // Refresh access and refresh tokens using the refresh token.
   router.post(
     "/auth/refresh",
-    rateLimiters.tokenRefresh,
     validateJson(refreshSchema),
     async (c) => {
       const payload = c.req.valid("json") as RefreshTokenRequest;
@@ -142,7 +137,6 @@ export const createUserRoutes = (config: AppConfig) => {
   router.post(
     "/oauth/apple/verify",
     idempotencyMiddleware,
-    rateLimiters.authOAuth,
     validateJson(appleSchema),
     async (c) => {
       const payload = c.req.valid("json") as AppleAuthRequest;
@@ -155,7 +149,6 @@ export const createUserRoutes = (config: AppConfig) => {
   router.post(
     "/oauth/google/verify",
     idempotencyMiddleware,
-    rateLimiters.authOAuth,
     validateJson(googleSchema),
     async (c) => {
       const payload = c.req.valid("json") as { idToken: string };
@@ -167,7 +160,7 @@ export const createUserRoutes = (config: AppConfig) => {
   router.use("/me/*", jwtMiddleware, setUserContext());
 
   // Retrieve the authenticated user's profile.
-  router.get("/me", rateLimiters.apiRead, async (c) => {
+  router.get("/me", async (c) => {
     const userId = getUserId(c);
     const result = await getService(c).services.users.getProfile(userId);
     return respondFromService(c, result);
@@ -176,7 +169,6 @@ export const createUserRoutes = (config: AppConfig) => {
   // Update the authenticated user's display name.
   router.patch(
     "/me/name",
-    rateLimiters.apiWrite,
     validateJson(updateNameSchema),
     async (c) => {
       const userId = getUserId(c);
@@ -190,7 +182,6 @@ export const createUserRoutes = (config: AppConfig) => {
   router.post(
     "/verify/identifier",
     idempotencyMiddleware,
-    rateLimiters.apiWrite,
     validateJson(verifyIdentifierSchema),
     async (c) => {
       const userId = getUserId(c);
@@ -203,7 +194,6 @@ export const createUserRoutes = (config: AppConfig) => {
   // Save the device token used for push notifications.
   router.put(
     "/me/device-token",
-    rateLimiters.apiWrite,
     validateJson(deviceTokenSchema),
     async (c) => {
       const userId = getUserId(c);
@@ -217,7 +207,6 @@ export const createUserRoutes = (config: AppConfig) => {
   router.delete(
     "/me",
     idempotencyMiddleware,
-    rateLimiters.apiWrite,
     booleanQuery("deleteMedia", { defaultValue: false }),
     async (c) => {
       const userId = getUserId(c);

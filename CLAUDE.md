@@ -102,6 +102,116 @@ All endpoints return a consistent JSON structure:
 }
 ```
 
+### Transaction Strategy
+
+**IMPORTANT**: Cloudflare D1 does NOT support SQL transaction statements (BEGIN/COMMIT/ROLLBACK) in Workers. Use the batch API for atomic multi-statement operations.
+
+#### D1 Batch API (Preferred)
+For atomic multi-statement operations where all parameters are known upfront:
+```typescript
+import { withBatch } from "../../data/transaction";
+
+await withBatch(db, (batch) => {
+  batch.add("DELETE FROM media_objects WHERE id = ?", mediaId);
+  batch.add("UPDATE locks SET album_title = ? WHERE id = ?", title, lockId);
+  batch.add("UPDATE users SET email_verified = 1 WHERE id = ?", userId);
+});
+// All statements succeed or all fail (true ACID semantics)
+```
+
+**Guarantees**: All-or-nothing atomic execution with automatic rollback on failure.
+
+#### Compensating Transactions
+When batch API can't be used (statement B needs result from statement A):
+```typescript
+// Create user first (returns generated ID)
+const user = await userRepository.create(userData);
+
+try {
+  // Use batch API for dependent operations
+  await withBatch(db, (batch) => {
+    batch.add("UPDATE users SET email_verified = 1 WHERE id = ?", user.id);
+    batch.add("INSERT INTO user_providers (user_id, provider) VALUES (?, ?)", user.id, provider);
+  });
+} catch (error) {
+  // Compensate: delete the user if linking failed
+  await userRepository.delete(user.id);
+  throw error;
+}
+```
+
+#### Idempotency Protection
+For operations vulnerable to race conditions (user registration, OAuth callbacks):
+```typescript
+import { withIdempotency } from "../../common/idempotency";
+
+const { isDuplicate, result } = await withIdempotency(
+  env.IDEMPOTENCY_KEYS,
+  `register:${email}`,
+  async () => {
+    return await userService.register(email, password);
+  }
+);
+
+if (isDuplicate) {
+  return c.json({ Success: false, Message: "Duplicate request" }, 409);
+}
+```
+
+**Note**: OAuth endpoints already have `idempotencyMiddleware` applied automatically.
+
+#### When to Use Each Pattern
+
+1. **Batch API** (`withBatch`) - Use when:
+   - All SQL parameters are known before execution
+   - Statements don't depend on results of previous statements
+   - Operations must succeed or fail together atomically
+   - Examples: Album publishing, account deletion, provider linking
+
+2. **Compensating Transactions** - Use when:
+   - Statement B needs the result of Statement A (e.g., generated ID)
+   - Can't collect all parameters upfront
+   - Examples: User creation + provider linking, user creation + verification
+
+3. **Idempotency Keys** - Use for:
+   - Preventing duplicate user registrations
+   - OAuth callback race conditions
+   - Critical state changes that shouldn't repeat
+
+4. **SQL-Level Atomicity** (no wrapper needed) - For:
+   - Single INSERT/UPDATE/DELETE statements
+   - Atomic increments: `UPDATE ... SET count = count + 1`
+
+#### Legacy withTransaction Function
+
+The `withTransaction()` function still exists for backwards compatibility but does NOT provide true transaction semantics. It's a pass-through wrapper with no atomicity guarantees across multiple statements.
+
+**DO NOT USE** for new code - use `withBatch()` instead.
+
+```typescript
+// ❌ BAD: No atomicity
+await withTransaction(db, async (tx) => {
+  await tx.prepare("INSERT INTO users ...").run();
+  await tx.prepare("UPDATE locks ...").run();
+  // If UPDATE fails, INSERT is NOT rolled back
+});
+
+// ✅ GOOD: True atomicity
+await withBatch(db, (batch) => {
+  batch.add("INSERT INTO users ...", ...params);
+  batch.add("UPDATE locks ...", ...params);
+  // Both succeed or both fail
+});
+```
+
+#### Common Pitfalls
+
+- ❌ Don't try to use BEGIN/COMMIT/ROLLBACK SQL (D1 will reject them)
+- ❌ Don't assume multiple separate `.run()` calls are atomic (they're not)
+- ❌ Don't nest batch() calls (not supported)
+- ✅ Remember: D1 batch API limit is 100 bound parameters per query
+- ✅ Individual D1 statements are always atomic (single INSERT/UPDATE/DELETE)
+
 ## Configuration & Bindings
 
 Configuration is loaded from Cloudflare Worker bindings via `loadConfig()` in `src/config/env.ts`.

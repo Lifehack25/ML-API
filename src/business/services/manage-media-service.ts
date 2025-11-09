@@ -9,7 +9,7 @@ import { mapMediaRowToAlbum, mapMediaRowToCreated } from "../../data/mappers/med
 import { CloudflareMediaClient } from "../../infrastructure/cloudflare";
 import { SightengineClient } from "../../infrastructure/sightengine";
 import type { StorageLimits } from "../../config/env";
-import { withTransaction } from "../../data/transaction";
+import { withTransaction, withBatch } from "../../data/transaction";
 import {
   CreatedMedia,
   MetadataChange,
@@ -230,63 +230,67 @@ export class ManageMediaService {
     const mainImageUpdates = changes.filter((c) => c.changeType === MetadataChangeType.UpdateMainImage);
 
     try {
-      // Wrap all DB operations in a single transaction
-      const mediaToCleanup = await withTransaction(this.lockRepository["db"], async (tx) => {
-        const cleanupList: Array<{ cloudflare_id: string; media_type: "image" | "video" }> = [];
+      // Collect all data before starting the batch transaction
+      const cleanupList: Array<{ cloudflare_id: string; media_type: "image" | "video" }> = [];
 
-        // 1. Process deletions - collect Cloudflare IDs for cleanup
-        if (deletes.length > 0) {
-          this.logger.info("Processing deletions", { count: deletes.length });
+      // 1. Fetch media info for deletions (need Cloudflare IDs for cleanup)
+      if (deletes.length > 0) {
+        this.logger.info("Collecting deletion metadata", { count: deletes.length });
 
-          for (const change of deletes) {
-            if (!change.mediaId) {
-              throw new Error("mediaId is required for delete");
-            }
+        for (const change of deletes) {
+          if (!change.mediaId) {
+            throw new Error("mediaId is required for delete");
+          }
 
-            // Fetch media to get Cloudflare ID before deletion
-            const media = await this.mediaRepository.findById(change.mediaId, tx);
-            if (media && media.cloudflare_id) {
-              cleanupList.push({
-                cloudflare_id: media.cloudflare_id,
-                media_type: media.is_image ? "image" : "video",
-              });
-            }
+          // Fetch media to get Cloudflare ID before deletion
+          const media = await this.mediaRepository.findById(change.mediaId);
+          if (media && media.cloudflare_id) {
+            cleanupList.push({
+              cloudflare_id: media.cloudflare_id,
+              media_type: media.is_image ? "image" : "video",
+            });
+          }
+        }
+      }
 
-            // Delete from DB (within transaction)
-            await this.mediaRepository.delete(change.mediaId, tx);
+      // 2. Execute all DB operations atomically using batch API
+      await withBatch(this.lockRepository["db"], (batch) => {
+        // Delete media objects
+        for (const change of deletes) {
+          if (change.mediaId) {
+            batch.add("DELETE FROM media_objects WHERE id = ?", change.mediaId);
           }
         }
 
-        // 2. Process reorders as a batch (within transaction)
-        if (reorders.length > 0) {
-          this.logger.info("Processing reorders as batch", { count: reorders.length });
-          await this.processBatchReorder(reorders, tx);
-        }
-
-        // 3. Process main image updates (within transaction)
-        if (mainImageUpdates.length > 0) {
-          this.logger.info("Processing main image updates", { count: mainImageUpdates.length });
-
-          for (const change of mainImageUpdates) {
-            if (!change.mediaId || change.isMainImage === undefined || change.isMainImage === null) {
-              throw new Error("mediaId and isMainImage are required for main image update");
-            }
-            await this.mediaRepository.update(
-              change.mediaId,
-              { is_main_picture: change.isMainImage === true },
-              tx
+        // Reorder media objects
+        for (const change of reorders) {
+          if (change.mediaId && change.newDisplayOrder !== undefined && change.newDisplayOrder !== null) {
+            batch.add(
+              "UPDATE media_objects SET display_order = ? WHERE id = ?",
+              change.newDisplayOrder,
+              change.mediaId
             );
           }
         }
 
-        // 4. Update album title if provided (within transaction)
-        if (albumTitle) {
-          await this.lockRepository.update(lockId, { album_title: albumTitle }, tx);
+        // Update main image flags
+        for (const change of mainImageUpdates) {
+          if (change.mediaId && change.isMainImage !== undefined && change.isMainImage !== null) {
+            batch.add(
+              "UPDATE media_objects SET is_main_picture = ? WHERE id = ?",
+              change.isMainImage ? 1 : 0,
+              change.mediaId
+            );
+          }
         }
 
-        // Transaction commits here - all or nothing
-        return cleanupList;
+        // Update album title
+        if (albumTitle) {
+          batch.add("UPDATE locks SET album_title = ? WHERE id = ?", albumTitle, lockId);
+        }
       });
+
+      const mediaToCleanup = cleanupList;
 
       // 5. Schedule Cloudflare cleanup jobs (after transaction succeeds)
       for (const media of mediaToCleanup) {

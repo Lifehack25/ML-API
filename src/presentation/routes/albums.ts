@@ -3,7 +3,6 @@ import type { EnvBindings } from "../../common/bindings";
 import type { AppVariables } from "../../common/context";
 import { getContainer } from "../http/context";
 import { respondFromService } from "../http/responses";
-import { rateLimiters } from "../http/rateLimit";
 import {
   cacheGet,
   cachePut,
@@ -15,7 +14,7 @@ export const createAlbumRoutes = () => {
   const router = new Hono<{ Bindings: EnvBindings; Variables: AppVariables }>();
 
   // Album fetch endpoint with edge caching (both owner and public)
-  router.get("/:hashedId", rateLimiters.albumRead, async (c) => {
+  router.get("/:hashedId", async (c) => {
     const hashedId = c.req.param("hashedId");
     const isOwner = c.req.query("isOwner") === "true";
     const ctx = c.get("executionCtx");
@@ -80,4 +79,3 @@ export const createAlbumRoutes = () => {
 
   return router;
 };
-

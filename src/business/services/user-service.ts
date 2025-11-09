@@ -5,7 +5,7 @@ import { LockRepository } from "../../data/repositories/lock-repository";
 import { MediaObjectRepository } from "../../data/repositories/media-object-repository";
 import { CleanupJobRepository } from "../../data/repositories/cleanup-job-repository";
 import { mapUserRowToProfile } from "../../data/mappers/user-mapper";
-import { withTransaction } from "../../data/transaction";
+import { withTransaction, withBatch } from "../../data/transaction";
 import {
   UpdateDeviceTokenRequest,
   UpdateUserNameRequest,
@@ -150,37 +150,45 @@ export class UserService {
 
     try {
       // Wrap all DB operations in transaction
-      const mediaToCleanup = await withTransaction(this.db, async (tx) => {
-        const cleanupList: Array<{ cloudflare_id: string; media_type: "image" | "video" }> = [];
+      // Collect all data before starting the batch transaction
+      const cleanupList: Array<{ cloudflare_id: string; media_type: "image" | "video" }> = [];
+      const mediaDeletes: number[] = [];
 
-        if (deleteMedia) {
-          // Get all locks for user
-          const locks = await this.lockRepository.findAllByUserId(userId, tx);
+      if (deleteMedia) {
+        // Get all locks for user
+        const locks = await this.lockRepository.findAllByUserId(userId);
 
-          // Collect media for Cloudflare cleanup
-          for (const lock of locks) {
-            const mediaItems = await this.mediaRepository.findByLockId(lock.id, 100, tx);
-            for (const media of mediaItems) {
-              if (media.cloudflare_id) {
-                cleanupList.push({
-                  cloudflare_id: media.cloudflare_id,
-                  media_type: media.is_image ? "image" : "video",
-                });
-              }
+        // Collect media for Cloudflare cleanup and deletion
+        for (const lock of locks) {
+          const mediaItems = await this.mediaRepository.findByLockId(lock.id, 100);
+          for (const media of mediaItems) {
+            if (media.cloudflare_id) {
+              cleanupList.push({
+                cloudflare_id: media.cloudflare_id,
+                media_type: media.is_image ? "image" : "video",
+              });
             }
-
-            // Delete media from DB (within transaction)
-            await this.mediaRepository.deleteByLockId(lock.id, tx);
+            mediaDeletes.push(lock.id); // Track lock IDs for batch deletion
           }
         }
+      }
 
-        // Clear lock associations and delete user (within transaction)
-        await this.lockRepository.clearUserAssociation(userId, tx);
-        await this.userRepository.delete(userId, tx);
+      // Execute all database deletes atomically using batch API
+      await withBatch(this.db, (batch) => {
+        // Delete all media for each lock
+        for (const lockId of [...new Set(mediaDeletes)]) {
+          // Use Set to deduplicate lock IDs
+          batch.add("DELETE FROM media_objects WHERE lock_id = ?", lockId);
+        }
 
-        // Transaction commits - all or nothing
-        return cleanupList;
+        // Clear lock associations (set user_id to NULL)
+        batch.add("UPDATE locks SET user_id = NULL WHERE user_id = ?", userId);
+
+        // Delete the user
+        batch.add("DELETE FROM users WHERE id = ?", userId);
       });
+
+      const mediaToCleanup = cleanupList;
 
       // Schedule Cloudflare cleanup jobs (after transaction succeeds)
       for (const media of mediaToCleanup) {

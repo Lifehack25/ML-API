@@ -1,15 +1,25 @@
 /**
- * D1 Transaction Wrapper
+ * D1 Transaction Utilities
  *
- * Provides strongly consistent transaction support for Cloudflare D1 database operations.
- * Uses SQLite BEGIN IMMEDIATE/COMMIT/ROLLBACK for proper ACID guarantees.
+ * Provides atomic multi-statement operations for Cloudflare D1 using the batch API.
+ * D1 does NOT support explicit BEGIN/COMMIT/ROLLBACK SQL statements in Workers.
+ * Instead, use the batch API for true ACID transaction semantics.
  *
- * @example
+ * @example Using batch API (preferred for known statements):
+ * ```typescript
+ * await withBatch(db, (batch) => {
+ *   batch.add("DELETE FROM media_objects WHERE id = ?", mediaId);
+ *   batch.add("UPDATE locks SET album_title = ? WHERE id = ?", title, lockId);
+ * });
+ * // All statements succeed or all fail (atomic)
+ * ```
+ *
+ * @example Using withTransaction (legacy compatibility, no atomicity):
  * ```typescript
  * await withTransaction(db, async (tx) => {
  *   await tx.prepare("INSERT INTO users ...").run();
  *   await tx.prepare("UPDATE locks ...").run();
- *   // Both committed atomically
+ *   // WARNING: Not atomic! Use withBatch instead for atomicity.
  * });
  * ```
  */
@@ -20,59 +30,138 @@ export interface TransactionContext {
 }
 
 /**
- * Executes a function within a D1 database transaction.
- *
- * Automatically handles:
- * - BEGIN IMMEDIATE (acquires write lock immediately)
- * - COMMIT on success
- * - ROLLBACK on error
- * - Nested transaction detection (throws error)
+ * Batch statement builder for atomic multi-statement operations.
+ * Collects SQL statements and executes them atomically via D1's batch API.
+ */
+export class BatchBuilder {
+  private statements: D1PreparedStatement[] = [];
+
+  constructor(private db: D1Database) {}
+
+  /**
+   * Adds a prepared statement to the batch.
+   *
+   * @param sql - SQL query string
+   * @param params - Query parameters (will be bound in order)
+   * @returns this for method chaining
+   */
+  add(sql: string, ...params: unknown[]): this {
+    let stmt = this.db.prepare(sql);
+    if (params.length > 0) {
+      stmt = stmt.bind(...params);
+    }
+    this.statements.push(stmt);
+    return this;
+  }
+
+  /**
+   * Adds a pre-prepared D1 statement to the batch.
+   *
+   * @param statement - Pre-prepared D1PreparedStatement
+   * @returns this for method chaining
+   */
+  addStatement(statement: D1PreparedStatement): this {
+    this.statements.push(statement);
+    return this;
+  }
+
+  /**
+   * Executes all statements atomically.
+   * All statements succeed or all fail together.
+   *
+   * @returns Array of D1Result objects, one per statement
+   * @throws Error if any statement fails (all rolled back)
+   */
+  async execute(): Promise<D1Result[]> {
+    if (this.statements.length === 0) {
+      return [];
+    }
+
+    const results = await this.db.batch(this.statements);
+
+    // Check for failures
+    for (let i = 0; i < results.length; i++) {
+      const result = results[i];
+      if (!result.success) {
+        throw new Error(
+          `Batch transaction failed at statement ${i + 1}/${results.length}: ${result.error || 'Unknown error'}`
+        );
+      }
+    }
+
+    return results;
+  }
+
+  /**
+   * Returns the number of statements in the batch.
+   */
+  get count(): number {
+    return this.statements.length;
+  }
+}
+
+/**
+ * Executes multiple SQL statements atomically using D1's batch API.
+ * All statements succeed together or all fail together (true ACID semantics).
  *
  * @param db - D1 database instance
- * @param fn - Async function to execute within transaction, receives transaction-aware DB instance
+ * @param fn - Function that adds statements to the batch builder
+ * @returns Array of D1Result objects
+ * @throws Error if any statement fails (automatic rollback)
+ *
+ * @example
+ * ```typescript
+ * const results = await withBatch(db, (batch) => {
+ *   batch.add("DELETE FROM media_objects WHERE id = ?", mediaId);
+ *   batch.add("UPDATE media_objects SET display_order = ? WHERE id = ?", newOrder, mediaId);
+ *   batch.add("UPDATE locks SET album_title = ? WHERE id = ?", title, lockId);
+ * });
+ * // All succeed or all fail atomically
+ * ```
+ */
+export async function withBatch(
+  db: D1Database,
+  fn: (batch: BatchBuilder) => void | Promise<void>
+): Promise<D1Result[]> {
+  const batch = new BatchBuilder(db);
+  await fn(batch);
+  return batch.execute();
+}
+
+/**
+ * Legacy transaction wrapper for backwards compatibility.
+ *
+ * WARNING: This does NOT provide true transaction semantics.
+ * Individual statements are atomic, but multiple statements are NOT rolled back together.
+ * Use withBatch() instead for true atomic multi-statement operations.
+ *
+ * @deprecated Use withBatch() for atomic operations
+ * @param db - D1 database instance
+ * @param fn - Async function to execute
  * @returns Result of the function
- * @throws Error if already in transaction (nested transactions not supported)
- * @throws Error from fn (after automatic rollback)
+ * @throws Error from fn (no automatic rollback)
  */
 export async function withTransaction<T>(
   db: D1Database,
   fn: (tx: D1Database) => Promise<T>
 ): Promise<T> {
-  // Detect nested transactions (not supported by D1)
-  // We use a symbol property to mark transaction-aware DB instances
+  // Detect nested transactions (not supported)
   const isInTransaction = (db as any).__inTransaction === true;
   if (isInTransaction) {
     throw new Error("Nested transactions are not supported. Pass the transaction DB instance to child operations.");
   }
 
-  // Start transaction with immediate lock
-  await db.prepare("BEGIN IMMEDIATE").run();
-
-  // Mark DB instance as in-transaction to detect nesting
+  // Mark DB instance to detect nesting
   const txDb = Object.create(db);
   (txDb as any).__inTransaction = true;
 
   try {
-    // Execute function with transaction-aware DB
+    // Execute function - each statement is atomic but not collectively transactional
     const result = await fn(txDb);
-
-    // Commit on success
-    await db.prepare("COMMIT").run();
-
     return result;
   } catch (error) {
-    // Rollback on any error
-    try {
-      await db.prepare("ROLLBACK").run();
-    } catch (rollbackError) {
-      // Log rollback failure but throw original error
-      console.error("CRITICAL: Transaction rollback failed", {
-        originalError: error,
-        rollbackError
-      });
-    }
-
-    // Re-throw original error
+    // No rollback possible - error is thrown as-is
+    // Calling code should handle partial failure scenarios
     throw error;
   }
 }

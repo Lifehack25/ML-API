@@ -1,11 +1,11 @@
-import { LockRow } from "../models/lock";
-import { LockSummary, DateOnlyString } from "../../business/dtos/locks";
+import type { Lock } from "../schema";
+import type { LockSummary, DateOnlyString } from "../../business/dtos/locks";
 import type { HashIdHelper } from "../../common/hashids";
 
 const bool = (value: number | boolean): boolean =>
   typeof value === "boolean" ? value : value !== 0;
 
-export const mapLockRowToSummary = (row: LockRow, hashids: HashIdHelper): LockSummary => ({
+export const mapLockRowToSummary = (row: Lock, hashids: HashIdHelper): LockSummary => ({
   lockId: row.id,
   hashedLockId: hashids.encode(row.id),
   lockName: row.lock_name,

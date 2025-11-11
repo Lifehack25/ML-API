@@ -10,6 +10,7 @@ import { createAppleVerifier } from "../infrastructure/Auth/oauth-apple";
 import { createGoogleVerifier } from "../infrastructure/Auth/oauth-google";
 import { createJwtService } from "../infrastructure/Auth/jwt";
 import { IdempotencyService } from "../infrastructure/idempotency";
+import { createDrizzleClient, type DrizzleClient } from "../data/db";
 import { UserRepository } from "../data/repositories/user-repository";
 import { LockRepository } from "../data/repositories/lock-repository";
 import { MediaObjectRepository } from "../data/repositories/media-object-repository";
@@ -28,7 +29,7 @@ import type { Logger } from "./logger";
 export interface ServiceContainer {
   config: AppConfig;
   logger: Logger;
-  db: D1Database;
+  db: DrizzleClient;
   hashids: ReturnType<typeof createHashIdHelper>;
   idempotencyService: IdempotencyService;
   repositories: {
@@ -70,10 +71,12 @@ export const createRequestContext = (
   const googleVerifier = createGoogleVerifier(config.google);
   const jwtService = createJwtService(config.jwt);
 
-  const userRepository = new UserRepository(env.DB);
-  const lockRepository = new LockRepository(env.DB);
-  const mediaRepository = new MediaObjectRepository(env.DB);
-  const cleanupJobRepository = new CleanupJobRepository(env.DB);
+  const db = createDrizzleClient(env.DB);
+
+  const userRepository = new UserRepository(db);
+  const lockRepository = new LockRepository(db);
+  const mediaRepository = new MediaObjectRepository(db);
+  const cleanupJobRepository = new CleanupJobRepository(db);
 
   const hashHelper = createHashIdHelper(config.hashids);
   const idempotencyService = new IdempotencyService(env.IDEMPOTENCY_KEYS);
@@ -85,7 +88,8 @@ export const createRequestContext = (
     cloudflareClient,
     sightengineClient,
     logger,
-    config.storageLimits
+    config.storageLimits,
+    db
   );
 
   const lockService = new LockService(
@@ -117,10 +121,10 @@ export const createRequestContext = (
   );
 
   const sessionTokenService = new SessionTokenService(jwtService, userRepository, logger);
-  const oauthUserLinkService = new OAuthUserLinkService(env.DB, userRepository, logger);
+  const oauthUserLinkService = new OAuthUserLinkService(db, userRepository, logger);
 
   const authService = new UserAuthFlowService(
-    env.DB,
+    db,
     userRepository,
     twilioClient,
     jwtService,
@@ -132,7 +136,7 @@ export const createRequestContext = (
   );
 
   const userService = new UserService(
-    env.DB,
+    db,
     userRepository,
     lockRepository,
     mediaRepository,
@@ -144,7 +148,7 @@ export const createRequestContext = (
   return {
     config,
     logger,
-    db: env.DB,
+    db,
     hashids: hashHelper,
     idempotencyService,
     repositories: {

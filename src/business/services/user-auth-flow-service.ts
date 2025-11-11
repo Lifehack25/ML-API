@@ -1,12 +1,12 @@
 import { Logger } from "../../common/logger";
 import { failure, ServiceResult, success } from "../../common/result";
 import { UserRepository } from "../../data/repositories/user-repository";
-import { TwilioVerifyClient } from "../../infrastructure/Auth/twilio";
-import { JwtService } from "../../infrastructure/Auth/jwt";
-import { AppleVerifier } from "../../infrastructure/Auth/oauth-apple";
-import { GoogleVerifier } from "../../infrastructure/Auth/oauth-google";
-import { withTransaction } from "../../data/transaction";
-import {
+import type { TwilioVerifyClient } from "../../infrastructure/Auth/twilio";
+import type { JwtService } from "../../infrastructure/Auth/jwt";
+import type { AppleVerifier } from "../../infrastructure/Auth/oauth-apple";
+import type { GoogleVerifier } from "../../infrastructure/Auth/oauth-google";
+import type { DrizzleClient } from "../../data/db";
+import type {
   AppleAuthRequest,
   GoogleAuthRequest,
   JwtTokens,
@@ -15,7 +15,7 @@ import {
   VerifyCodeRequest,
 } from "../dtos/users";
 import { SessionTokenService } from "./session-token-service";
-import { OAuthUserInfo, OAuthUserLinkService } from "./oauth-user-link-service";
+import type { OAuthUserInfo, OAuthUserLinkService } from "./oauth-user-link-service";
 
 const normalizeEmail = (email: string) => email.trim().toLowerCase();
 
@@ -23,7 +23,7 @@ const sanitizePhone = (phone: string) => phone.replace(/\s+/g, "");
 
 export class UserAuthFlowService {
   constructor(
-    private readonly db: D1Database,
+    private readonly db: DrizzleClient,
     private readonly userRepository: UserRepository,
     private readonly twilioClient: TwilioVerifyClient | null,
     private readonly jwtService: JwtService,
@@ -121,47 +121,39 @@ export class UserAuthFlowService {
         return failure("INVALID_NAME", "Name is required for registration", undefined, 400);
       }
 
-      // Wrap DB operations in transaction
+      // Check for duplicates first
       try {
-        const created = await withTransaction(this.db, async (tx) => {
-          // Prevent duplicate accounts (within transaction)
-          if (request.isEmail) {
-            const existing = await this.userRepository.findByEmailCaseInsensitive(identifier, tx);
-            if (existing) {
-              throw new Error("ACCOUNT_EXISTS: An account with this email already exists");
-            }
-          } else {
-            const existingPhone =
-              (await this.userRepository.findByPhoneNumber(identifier, tx)) ||
-              (await this.userRepository.findByNormalizedPhoneNumber(identifier, tx));
-            if (existingPhone) {
-              throw new Error("ACCOUNT_EXISTS: An account with this phone number already exists");
-            }
+        if (request.isEmail) {
+          const existing = await this.userRepository.findByEmailCaseInsensitive(identifier);
+          if (existing) {
+            return failure("ACCOUNT_EXISTS", "An account with this email already exists", undefined, 409);
           }
-
-          // Create user
-          const user = await this.userRepository.create(
-            {
-              name: trimmedName,
-              email: request.isEmail ? normalizeEmail(identifier) : null,
-              phoneNumber: request.isEmail ? null : sanitizePhone(identifier),
-              authProvider: "Registration",
-              providerId: null,
-            },
-            tx
-          );
-
-          // Mark verified
-          if (request.isEmail) {
-            await this.userRepository.markEmailVerified(user.id, tx);
-          } else {
-            await this.userRepository.markPhoneVerified(user.id, tx);
+        } else {
+          const existingPhone =
+            (await this.userRepository.findByPhoneNumber(identifier)) ||
+            (await this.userRepository.findByNormalizedPhoneNumber(identifier));
+          if (existingPhone) {
+            return failure("ACCOUNT_EXISTS", "An account with this phone number already exists", undefined, 409);
           }
+        }
 
-          return user;
+        // Create user
+        const created = await this.userRepository.create({
+          name: trimmedName,
+          email: request.isEmail ? normalizeEmail(identifier) : null,
+          phoneNumber: request.isEmail ? null : sanitizePhone(identifier),
+          authProvider: "Registration",
+          providerId: null,
         });
 
-        // Issue tokens after successful transaction
+        // Mark verified
+        if (request.isEmail) {
+          await this.userRepository.markEmailVerified(created.id);
+        } else {
+          await this.userRepository.markPhoneVerified(created.id);
+        }
+
+        // Issue tokens after successful creation
         const tokens = await this.sessionTokenService.issueTokens(created.id, {
           emailVerified: request.isEmail ? true : undefined,
           phoneVerified: request.isEmail ? undefined : true,

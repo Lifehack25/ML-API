@@ -6,19 +6,21 @@ import type { MediaCreateRequest } from "../../data/repositories/media-object-re
 import { LockRepository } from "../../data/repositories/lock-repository";
 import { CleanupJobRepository } from "../../data/repositories/cleanup-job-repository";
 import { mapMediaRowToAlbum, mapMediaRowToCreated } from "../../data/mappers/media-mapper";
-import { CloudflareMediaClient } from "../../infrastructure/cloudflare";
-import { SightengineClient } from "../../infrastructure/sightengine";
+import type { CloudflareMediaClient } from "../../infrastructure/cloudflare";
+import type { SightengineClient } from "../../infrastructure/sightengine";
 import type { StorageLimits } from "../../config/env";
-import { withTransaction, withBatch } from "../../data/transaction";
-import {
+import type { DrizzleClient } from "../../data/db";
+import { mediaObjects, locks } from "../../data/schema";
+import { eq } from "drizzle-orm";
+import type {
   CreatedMedia,
   MetadataChange,
-  MetadataChangeType,
   PublishMetadataRequest,
   PublishResult,
   UploadMediaPayload,
   ValidationData,
 } from "../dtos/locks";
+import { MetadataChangeType } from "../dtos/locks";
 
 const MAX_IMAGE_BYTES = 15_728_640; // 15 MB
 
@@ -30,7 +32,8 @@ export class ManageMediaService {
     private readonly cloudflareClient: CloudflareMediaClient,
     private readonly sightengineClient: SightengineClient,
     private readonly logger: Logger,
-    private readonly storageLimits: StorageLimits
+    private readonly storageLimits: StorageLimits,
+    private readonly db: DrizzleClient
   ) {}
 
   private async getValidationData(lockId: number): Promise<ValidationData> {
@@ -254,41 +257,47 @@ export class ManageMediaService {
       }
 
       // 2. Execute all DB operations atomically using batch API
-      await withBatch(this.lockRepository["db"], (batch) => {
-        // Delete media objects
-        for (const change of deletes) {
-          if (change.mediaId) {
-            batch.add("DELETE FROM media_objects WHERE id = ?", change.mediaId);
-          }
-        }
+      const batchQueries: any[] = [];
 
-        // Reorder media objects
-        for (const change of reorders) {
-          if (change.mediaId && change.newDisplayOrder !== undefined && change.newDisplayOrder !== null) {
-            batch.add(
-              "UPDATE media_objects SET display_order = ? WHERE id = ?",
-              change.newDisplayOrder,
-              change.mediaId
-            );
-          }
+      // Delete media objects
+      for (const change of deletes) {
+        if (change.mediaId) {
+          batchQueries.push(this.db.delete(mediaObjects).where(eq(mediaObjects.id, change.mediaId)));
         }
+      }
 
-        // Update main image flags
-        for (const change of mainImageUpdates) {
-          if (change.mediaId && change.isMainImage !== undefined && change.isMainImage !== null) {
-            batch.add(
-              "UPDATE media_objects SET is_main_picture = ? WHERE id = ?",
-              change.isMainImage ? 1 : 0,
-              change.mediaId
-            );
-          }
+      // Reorder media objects
+      for (const change of reorders) {
+        if (change.mediaId && change.newDisplayOrder !== undefined && change.newDisplayOrder !== null) {
+          batchQueries.push(
+            this.db
+              .update(mediaObjects)
+              .set({ display_order: change.newDisplayOrder })
+              .where(eq(mediaObjects.id, change.mediaId))
+          );
         }
+      }
 
-        // Update album title
-        if (albumTitle) {
-          batch.add("UPDATE locks SET album_title = ? WHERE id = ?", albumTitle, lockId);
+      // Update main image flags
+      for (const change of mainImageUpdates) {
+        if (change.mediaId && change.isMainImage !== undefined && change.isMainImage !== null) {
+          batchQueries.push(
+            this.db
+              .update(mediaObjects)
+              .set({ is_main_picture: change.isMainImage })
+              .where(eq(mediaObjects.id, change.mediaId))
+          );
         }
-      });
+      }
+
+      // Update album title
+      if (albumTitle) {
+        batchQueries.push(this.db.update(locks).set({ album_title: albumTitle }).where(eq(locks.id, lockId)));
+      }
+
+      if (batchQueries.length > 0) {
+        await this.db.batch(batchQueries as [any, ...any[]]);
+      }
 
       const mediaToCleanup = cleanupList;
 
@@ -332,7 +341,7 @@ export class ManageMediaService {
 
     this.logger.info("Sending batch reorder request", { count: updates.length });
 
-    const updatedCount = await this.mediaRepository.batchReorder(updates, txDb);
+    const updatedCount = await this.mediaRepository.batchReorder(updates);
 
     if (updatedCount !== updates.length) {
       throw new Error(`Only ${updatedCount} of ${updates.length} updates succeeded`);

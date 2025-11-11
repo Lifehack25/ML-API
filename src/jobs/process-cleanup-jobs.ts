@@ -3,6 +3,7 @@ import { CleanupJobRepository } from "../data/repositories/cleanup-job-repositor
 import { createCloudflareMediaClient } from "../infrastructure/cloudflare";
 import { loadConfig } from "../config/env";
 import { createLogger } from "../common/logger";
+import { createDrizzleClient } from "../data/db";
 
 /**
  * Processes pending Cloudflare cleanup jobs with exponential backoff retry logic.
@@ -11,7 +12,8 @@ import { createLogger } from "../common/logger";
 export async function processCleanupJobs(env: EnvBindings, ctx: ExecutionContext): Promise<void> {
   const logger = createLogger("cleanup-jobs");
   const config = loadConfig(env);
-  const cleanupJobRepo = new CleanupJobRepository(env.DB);
+  const db = createDrizzleClient(env.DB);
+  const cleanupJobRepo = new CleanupJobRepository(db);
   const cloudflareClient = createCloudflareMediaClient(config.cloudflareMedia);
 
   try {

@@ -1,6 +1,6 @@
-import type { MediaObjectRow } from "../models/media-object";
-import type { D1Result } from "./types";
-import { getTransactionDb, withTransaction } from "../transaction";
+import { eq, and, asc, desc } from "drizzle-orm";
+import type { DrizzleClient } from "../db";
+import { mediaObjects, type MediaObject } from "../schema";
 
 export interface MediaCreateRequest {
   lock_id: number;
@@ -26,233 +26,151 @@ export interface MediaUpdateRequest {
 }
 
 export class MediaObjectRepository {
-  constructor(private readonly db: D1Database) {}
+  constructor(private readonly db: DrizzleClient) {}
 
-  async findById(id: number, txDb?: D1Database): Promise<MediaObjectRow | null> {
-    const db = getTransactionDb(this.db, txDb);
-    const result: D1Result<MediaObjectRow> = await db
-      .prepare("SELECT * FROM media_objects WHERE id = ?")
-      .bind(id)
-      .all();
-
-    if (!result.success || result.results.length === 0) {
-      return null;
-    }
-
-    return result.results[0];
+  async findById(id: number): Promise<MediaObject | null> {
+    const result = await this.db
+      .select()
+      .from(mediaObjects)
+      .where(eq(mediaObjects.id, id))
+      .limit(1);
+    return result[0] ?? null;
   }
 
-  async findByLockId(lockId: number, limit = 100, txDb?: D1Database): Promise<MediaObjectRow[]> {
-    const db = getTransactionDb(this.db, txDb);
-    const result: D1Result<MediaObjectRow> = await db
-      .prepare(
-        "SELECT * FROM media_objects WHERE lock_id = ? ORDER BY display_order ASC, created_at DESC LIMIT ?"
-      )
-      .bind(lockId, limit)
-      .all();
-
-    if (!result.success) {
-      throw new Error("Failed to fetch media objects");
-    }
-
-    return result.results;
+  async findByLockId(lockId: number, limit = 100): Promise<MediaObject[]> {
+    return await this.db
+      .select()
+      .from(mediaObjects)
+      .where(eq(mediaObjects.lock_id, lockId))
+      .orderBy(asc(mediaObjects.display_order), desc(mediaObjects.created_at))
+      .limit(limit);
   }
 
-  private async unsetMainPicture(lockId: number, txDb?: D1Database): Promise<void> {
-    const db = getTransactionDb(this.db, txDb);
-    const result = await db
-      .prepare("UPDATE media_objects SET is_main_picture = 0 WHERE lock_id = ? AND is_main_picture = 1")
-      .bind(lockId)
-      .run();
-
-    if (!result.success) {
-      throw new Error("Failed to unset current main picture");
-    }
+  private async unsetMainPicture(lockId: number): Promise<void> {
+    await this.db
+      .update(mediaObjects)
+      .set({ is_main_picture: false })
+      .where(and(eq(mediaObjects.lock_id, lockId), eq(mediaObjects.is_main_picture, true)));
   }
 
   /**
    * Create a new media object. If setting as main picture, unsets current main picture atomically.
-   * Can participate in external transaction if txDb provided.
    */
-  async create(request: MediaCreateRequest, txDb?: D1Database): Promise<MediaObjectRow> {
-    const db = getTransactionDb(this.db, txDb);
-
-    // If no external transaction, wrap in our own transaction
-    if (!txDb) {
-      return withTransaction(this.db, async (tx) => {
-        return this.create(request, tx);
-      });
-    }
-
-    // Inside transaction - execute operations
+  async create(request: MediaCreateRequest): Promise<MediaObject> {
+    // If setting as main picture, unset current main picture first
     if (request.is_main_picture) {
-      await this.unsetMainPicture(request.lock_id, db);
+      await this.unsetMainPicture(request.lock_id);
     }
 
     const now = new Date().toISOString();
 
-    const result: D1Result = await db
-      .prepare(
-        `INSERT INTO media_objects (
-          lock_id, cloudflare_id, url, thumbnail_url, file_name,
-          is_image, is_main_picture, created_at, display_order, duration_seconds
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
-      )
-      .bind(
-        request.lock_id,
-        request.cloudflare_id,
-        request.url,
-        request.thumbnail_url ?? null,
-        request.file_name ?? null,
-        request.is_image === false ? 0 : 1,
-        request.is_main_picture === true,
-        now,
-        request.display_order ?? 0,
-        request.duration_seconds ?? null
-      )
-      .run();
+    const result = await this.db
+      .insert(mediaObjects)
+      .values({
+        lock_id: request.lock_id,
+        cloudflare_id: request.cloudflare_id,
+        url: request.url,
+        thumbnail_url: request.thumbnail_url ?? null,
+        file_name: request.file_name ?? null,
+        is_image: request.is_image === false ? 0 : 1,
+        is_main_picture: request.is_main_picture === true,
+        created_at: now,
+        display_order: request.display_order ?? 0,
+        duration_seconds: request.duration_seconds ?? null,
+      })
+      .returning();
 
-    if (!result.success) {
+    if (!result[0]) {
       throw new Error("Failed to create media object");
     }
 
-    const created = await this.findById(result.meta.last_row_id!, db);
-    if (!created) {
-      throw new Error("Failed to load created media object");
-    }
-
-    return created;
+    return result[0];
   }
 
   /**
    * Update a media object. If setting as main picture, unsets current main picture atomically.
-   * Can participate in external transaction if txDb provided.
    */
-  async update(id: number, request: MediaUpdateRequest, txDb?: D1Database): Promise<MediaObjectRow> {
-    const db = getTransactionDb(this.db, txDb);
-
-    // If no external transaction, wrap in our own transaction
-    if (!txDb) {
-      return withTransaction(this.db, async (tx) => {
-        return this.update(id, request, tx);
-      });
-    }
-
-    // Inside transaction - execute operations
-    const current = await this.findById(id, db);
+  async update(id: number, request: MediaUpdateRequest): Promise<MediaObject> {
+    // Get current media object to access lock_id
+    const current = await this.findById(id);
     if (!current) {
       throw new Error("Media object not found");
     }
 
+    // If setting as main picture, unset current main picture first
     if (request.is_main_picture === true) {
-      await this.unsetMainPicture(current.lock_id, db);
+      await this.unsetMainPicture(current.lock_id);
     }
 
-    const fields: string[] = [];
-    const values: unknown[] = [];
+    const updates: Partial<MediaObject> = {};
 
     if (request.cloudflare_id !== undefined) {
-      fields.push("cloudflare_id = ?");
-      values.push(request.cloudflare_id);
+      updates.cloudflare_id = request.cloudflare_id;
     }
     if (request.url !== undefined) {
-      fields.push("url = ?");
-      values.push(request.url);
+      updates.url = request.url;
     }
     if (request.thumbnail_url !== undefined) {
-      fields.push("thumbnail_url = ?");
-      values.push(request.thumbnail_url);
+      updates.thumbnail_url = request.thumbnail_url;
     }
     if (request.file_name !== undefined) {
-      fields.push("file_name = ?");
-      values.push(request.file_name);
+      updates.file_name = request.file_name;
     }
     if (request.is_image !== undefined) {
-      fields.push("is_image = ?");
-      values.push(request.is_image ? 1 : 0);
+      updates.is_image = request.is_image ? 1 : 0;
     }
     if (request.is_main_picture !== undefined) {
-      fields.push("is_main_picture = ?");
-      values.push(request.is_main_picture ? 1 : 0);
+      updates.is_main_picture = request.is_main_picture;
     }
     if (request.display_order !== undefined) {
-      fields.push("display_order = ?");
-      values.push(request.display_order);
+      updates.display_order = request.display_order;
     }
     if (request.duration_seconds !== undefined) {
-      fields.push("duration_seconds = ?");
-      values.push(request.duration_seconds);
+      updates.duration_seconds = request.duration_seconds;
     }
 
-    if (fields.length === 0) {
+    if (Object.keys(updates).length === 0) {
       throw new Error("No fields provided for media update");
     }
 
-    values.push(id);
+    const result = await this.db
+      .update(mediaObjects)
+      .set(updates)
+      .where(eq(mediaObjects.id, id))
+      .returning();
 
-    const query = `UPDATE media_objects SET ${fields.join(", ")} WHERE id = ?`;
-    const result = await db.prepare(query).bind(...values).run();
-
-    if (!result.success) {
+    if (!result[0]) {
       throw new Error("Failed to update media object");
     }
 
-    const updated = await this.findById(id, db);
-    if (!updated) {
-      throw new Error("Failed to load updated media object");
-    }
-
-    return updated;
+    return result[0];
   }
 
-  async delete(id: number, txDb?: D1Database): Promise<void> {
-    const db = getTransactionDb(this.db, txDb);
-    const result = await db.prepare("DELETE FROM media_objects WHERE id = ?").bind(id).run();
-    if (!result.success) {
-      throw new Error("Failed to delete media object");
-    }
+  async delete(id: number): Promise<void> {
+    await this.db.delete(mediaObjects).where(eq(mediaObjects.id, id));
   }
 
-  async deleteByLockId(lockId: number, txDb?: D1Database): Promise<void> {
-    const db = getTransactionDb(this.db, txDb);
-    const result = await db
-      .prepare("DELETE FROM media_objects WHERE lock_id = ?")
-      .bind(lockId)
-      .run();
-    if (!result.success) {
-      throw new Error("Failed to delete lock media objects");
-    }
+  async deleteByLockId(lockId: number): Promise<void> {
+    await this.db.delete(mediaObjects).where(eq(mediaObjects.lock_id, lockId));
   }
 
   /**
-   * Batch reorder media objects atomically.
-   * Uses true transaction instead of D1 batch API for all-or-nothing guarantee.
-   * Can participate in external transaction if txDb provided.
+   * Batch reorder media objects.
+   * Note: These are executed sequentially. For true atomicity, use within a transaction.
    */
-  async batchReorder(updates: Array<{ id: number; displayOrder: number }>, txDb?: D1Database): Promise<number> {
+  async batchReorder(updates: Array<{ id: number; displayOrder: number }>): Promise<number> {
     if (updates.length === 0) return 0;
 
-    const db = getTransactionDb(this.db, txDb);
-
-    // If no external transaction, wrap in our own transaction
-    if (!txDb) {
-      return withTransaction(this.db, async (tx) => {
-        return this.batchReorder(updates, tx);
-      });
-    }
-
-    // Inside transaction - execute all updates
     let successCount = 0;
     for (const update of updates) {
-      const result = await db
-        .prepare("UPDATE media_objects SET display_order = ? WHERE id = ?")
-        .bind(update.displayOrder, update.id)
-        .run();
-
-      if (result.success) {
+      try {
+        await this.db
+          .update(mediaObjects)
+          .set({ display_order: update.displayOrder })
+          .where(eq(mediaObjects.id, update.id));
         successCount++;
-      } else {
-        // Fail entire transaction if any update fails
+      } catch (error) {
+        // Fail entire batch if any update fails
         throw new Error(`Failed to reorder media object ${update.id}`);
       }
     }
@@ -260,4 +178,3 @@ export class MediaObjectRepository {
     return successCount;
   }
 }
-

@@ -1,11 +1,11 @@
-import { MediaObjectRow } from "../models/media-object";
-import { CreatedMedia } from "../../business/dtos/locks";
-import { AlbumMedia } from "../../business/dtos/albums";
+import type { MediaObject } from "../schema";
+import type { CreatedMedia } from "../../business/dtos/locks";
+import type { AlbumMedia } from "../../business/dtos/albums";
 
 const bool = (value: number | boolean): boolean =>
   typeof value === "boolean" ? value : value !== 0;
 
-export const mapMediaRowToAlbum = (row: MediaObjectRow): AlbumMedia => ({
+export const mapMediaRowToAlbum = (row: MediaObject): AlbumMedia => ({
   Id: row.id,
   IsImage: bool(row.is_image),
   Url: row.url,
@@ -15,7 +15,7 @@ export const mapMediaRowToAlbum = (row: MediaObjectRow): AlbumMedia => ({
   DurationSeconds: row.duration_seconds ?? null,
 });
 
-export const mapMediaRowToCreated = (row: MediaObjectRow): CreatedMedia => ({
+export const mapMediaRowToCreated = (row: MediaObject): CreatedMedia => ({
   id: row.id,
   cloudflareId: row.cloudflare_id,
   isImage: bool(row.is_image),

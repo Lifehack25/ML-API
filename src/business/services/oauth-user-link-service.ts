@@ -1,7 +1,9 @@
 import { UserRepository } from "../../data/repositories/user-repository";
 import { Logger } from "../../common/logger";
-import { CreateUserRequest } from "../dtos/users";
-import { withBatch } from "../../data/transaction";
+import type { CreateUserRequest } from "../dtos/users";
+import type { DrizzleClient } from "../../data/db";
+import { users } from "../../data/schema";
+import { eq } from "drizzle-orm";
 
 export interface OAuthUserInfo {
   provider: string;
@@ -13,7 +15,7 @@ export interface OAuthUserInfo {
 
 export class OAuthUserLinkService {
   constructor(
-    private readonly db: D1Database,
+    private readonly db: DrizzleClient,
     private readonly userRepository: UserRepository,
     private readonly logger: Logger
   ) {}
@@ -31,18 +33,18 @@ export class OAuthUserLinkService {
       const existingByEmail = await this.userRepository.findByEmailCaseInsensitive(info.email);
       if (existingByEmail) {
         // Link provider and mark verified atomically using batch API
-        await withBatch(this.db, (batch) => {
-          batch.add(
-            "UPDATE users SET auth_provider = ?, provider_id = ? WHERE id = ?",
-            info.provider,
-            info.providerId,
-            existingByEmail.id
-          );
+        const queries = [
+          this.db
+            .update(users)
+            .set({ auth_provider: info.provider, provider_id: info.providerId })
+            .where(eq(users.id, existingByEmail.id)),
+        ];
 
-          if (info.emailVerified) {
-            batch.add("UPDATE users SET email_verified = 1 WHERE id = ?", existingByEmail.id);
-          }
-        });
+        if (info.emailVerified) {
+          queries.push(this.db.update(users).set({ email_verified: true }).where(eq(users.id, existingByEmail.id)));
+        }
+
+        await this.db.batch(queries as any);
 
         this.logger.info("Linked provider to existing email", { provider: info.provider, userId: existingByEmail.id });
         return existingByEmail.id;
@@ -63,20 +65,24 @@ export class OAuthUserLinkService {
     try {
       // Update user atomically: mark email verified and link provider
       // Use batch API to ensure both updates succeed together
-      await withBatch(this.db, (batch) => {
-        if (info.emailVerified && createRequest.email) {
-          batch.add("UPDATE users SET email_verified = 1 WHERE id = ?", created.id);
-        }
+      const queries = [];
 
-        if (createRequest.authProvider && createRequest.providerId) {
-          batch.add(
-            "UPDATE users SET auth_provider = ?, provider_id = ? WHERE id = ?",
-            createRequest.authProvider,
-            createRequest.providerId,
-            created.id
-          );
-        }
-      });
+      if (info.emailVerified && createRequest.email) {
+        queries.push(this.db.update(users).set({ email_verified: true }).where(eq(users.id, created.id)));
+      }
+
+      if (createRequest.authProvider && createRequest.providerId) {
+        queries.push(
+          this.db
+            .update(users)
+            .set({ auth_provider: createRequest.authProvider, provider_id: createRequest.providerId })
+            .where(eq(users.id, created.id))
+        );
+      }
+
+      if (queries.length > 0) {
+        await this.db.batch(queries as any);
+      }
 
       this.logger.info("Created new external user", { provider: info.provider, userId: created.id });
       return created.id;

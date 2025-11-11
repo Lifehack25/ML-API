@@ -5,20 +5,22 @@ import { LockRepository } from "../../data/repositories/lock-repository";
 import { MediaObjectRepository } from "../../data/repositories/media-object-repository";
 import { CleanupJobRepository } from "../../data/repositories/cleanup-job-repository";
 import { mapUserRowToProfile } from "../../data/mappers/user-mapper";
-import { withTransaction, withBatch } from "../../data/transaction";
-import {
+import type { DrizzleClient } from "../../data/db";
+import { users, locks, mediaObjects } from "../../data/schema";
+import { eq } from "drizzle-orm";
+import type {
   UpdateDeviceTokenRequest,
   UpdateUserNameRequest,
   UserProfile,
   VerifyIdentifierRequest,
 } from "../dtos/users";
-import { TwilioVerifyClient } from "../../infrastructure/Auth/twilio";
+import type { TwilioVerifyClient } from "../../infrastructure/Auth/twilio";
 
 const sanitizePhone = (phone: string) => phone.replace(/\s+/g, "");
 
 export class UserService {
   constructor(
-    private readonly db: D1Database,
+    private readonly db: DrizzleClient,
     private readonly userRepository: UserRepository,
     private readonly lockRepository: LockRepository,
     private readonly mediaRepository: MediaObjectRepository,
@@ -88,31 +90,35 @@ export class UserService {
     }
 
     try {
-      // Wrap DB operations in transaction
-      await withTransaction(this.db, async (tx) => {
-        if (request.isEmail) {
-          const normalized = identifier.toLowerCase();
-          const existing = await this.userRepository.findByEmailCaseInsensitive(normalized, tx);
-          if (existing && existing.id !== request.userId) {
-            throw new Error("EMAIL_IN_USE: Email address is already in use");
-          }
-
-          await this.userRepository.updateEmail(request.userId, normalized, tx);
-          await this.userRepository.markEmailVerified(request.userId, tx);
-        } else {
-          const sanitized = sanitizePhone(identifier);
-          const existingByPhone = await this.userRepository.findByPhoneNumber(sanitized, tx);
-          const existingByNormalized = await this.userRepository.findByNormalizedPhoneNumber(sanitized, tx);
-          const existing = existingByPhone ?? existingByNormalized;
-
-          if (existing && existing.id !== request.userId) {
-            throw new Error("PHONE_IN_USE: Phone number is already in use");
-          }
-
-          await this.userRepository.updatePhoneNumber(request.userId, sanitized, tx);
-          await this.userRepository.markPhoneVerified(request.userId, tx);
+      // Check for conflicts first
+      if (request.isEmail) {
+        const normalized = identifier.toLowerCase();
+        const existing = await this.userRepository.findByEmailCaseInsensitive(normalized);
+        if (existing && existing.id !== request.userId) {
+          return failure("EMAIL_IN_USE", "Email address is already in use", undefined, 409);
         }
-      });
+
+        // Update atomically using batch
+        await this.db.batch([
+          this.db.update(users).set({ email: normalized }).where(eq(users.id, request.userId)),
+          this.db.update(users).set({ email_verified: true }).where(eq(users.id, request.userId)),
+        ] as any);
+      } else {
+        const sanitized = sanitizePhone(identifier);
+        const existingByPhone = await this.userRepository.findByPhoneNumber(sanitized);
+        const existingByNormalized = await this.userRepository.findByNormalizedPhoneNumber(sanitized);
+        const existing = existingByPhone ?? existingByNormalized;
+
+        if (existing && existing.id !== request.userId) {
+          return failure("PHONE_IN_USE", "Phone number is already in use", undefined, 409);
+        }
+
+        // Update atomically using batch
+        await this.db.batch([
+          this.db.update(users).set({ phone_number: sanitized }).where(eq(users.id, request.userId)),
+          this.db.update(users).set({ phone_verified: true }).where(eq(users.id, request.userId)),
+        ] as any);
+      }
 
       return success(true, "Identifier verified successfully");
     } catch (error) {
@@ -174,19 +180,23 @@ export class UserService {
       }
 
       // Execute all database deletes atomically using batch API
-      await withBatch(this.db, (batch) => {
-        // Delete all media for each lock
-        for (const lockId of [...new Set(mediaDeletes)]) {
-          // Use Set to deduplicate lock IDs
-          batch.add("DELETE FROM media_objects WHERE lock_id = ?", lockId);
-        }
+      const batchQueries: any[] = [];
 
-        // Clear lock associations (set user_id to NULL)
-        batch.add("UPDATE locks SET user_id = NULL WHERE user_id = ?", userId);
+      // Delete all media for each lock
+      for (const lockId of [...new Set(mediaDeletes)]) {
+        // Use Set to deduplicate lock IDs
+        batchQueries.push(this.db.delete(mediaObjects).where(eq(mediaObjects.lock_id, lockId)));
+      }
 
-        // Delete the user
-        batch.add("DELETE FROM users WHERE id = ?", userId);
-      });
+      // Clear lock associations (set user_id to NULL)
+      batchQueries.push(this.db.update(locks).set({ user_id: null }).where(eq(locks.user_id, userId)));
+
+      // Delete the user
+      batchQueries.push(this.db.delete(users).where(eq(users.id, userId)));
+
+      if (batchQueries.length > 0) {
+        await this.db.batch(batchQueries as [any, ...any[]]);
+      }
 
       const mediaToCleanup = cleanupList;
 

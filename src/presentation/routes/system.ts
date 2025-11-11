@@ -3,6 +3,7 @@ import type { Context } from "hono";
 import type { EnvBindings } from "../../common/bindings";
 import type { AppVariables, ServiceContainer } from "../../common/context";
 import { ok } from "../http/responses";
+import { sql } from "drizzle-orm";
 
 export const createSystemRoutes = () => {
   const router = new Hono<{ Bindings: EnvBindings; Variables: AppVariables }>();
@@ -28,8 +29,8 @@ export const createSystemRoutes = () => {
   router.get("/health/ready", async (c) => {
     try {
       const container = c.get("container") as ServiceContainer;
-      // Simple database connectivity test
-      await container.db.prepare("SELECT 1").first();
+      // Simple database connectivity test using Drizzle
+      await container.db.run(sql`SELECT 1`);
 
       return ok(c, {
         Status: "Ready",

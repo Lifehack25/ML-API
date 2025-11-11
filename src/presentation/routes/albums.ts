@@ -45,8 +45,8 @@ export const createAlbumRoutes = (config: AppConfig) => {
         return respondFromService(c, result);
       }
 
-      // Success - cache for 10 minutes
-      const ttlSeconds = 600;
+      // Success - cache for 12 hours
+      const ttlSeconds = 43200;
       await cachePut(cacheKey, result.data, { ttlSeconds });
 
       // Return response with cache miss header

@@ -39,6 +39,8 @@ crons = [
 [assets]
 directory = "./web-album"
 binding = "ASSETS"
+# Exclude index.html from automatic serving - it's rendered dynamically by the Worker
+html_handling = "none"
 
 # Routes
 [[routes]]

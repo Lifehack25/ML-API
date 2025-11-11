@@ -300,11 +300,8 @@
       return;
     }
 
-    console.log("Loading album data from server-side injection");
-
     // Use the server-injected data
     albumData = window.ALBUM_DATA;
-    console.log('Album Data:', JSON.stringify(albumData, null, 2));
 
     // Ensure media array exists (fallback to empty array if not present)
     if (!albumData.Media) {

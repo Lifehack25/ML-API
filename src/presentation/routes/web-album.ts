@@ -81,7 +81,7 @@ export const createWebAlbumRoutes = () => {
 
     // Fetch the HTML template from the assets binding
     const assetResponse = await c.env.ASSETS.fetch(
-      new Request("http://assets/template.html")
+      new Request("http://assets/index.html")
     );
 
     if (!assetResponse.ok) {

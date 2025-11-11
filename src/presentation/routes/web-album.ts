@@ -3,6 +3,10 @@ import type { EnvBindings } from "../../common/bindings";
 import type { AppVariables } from "../../common/context";
 import { getContainer } from "../http/context";
 import { fail } from "../http/responses";
+import {
+  getCacheKeyAlbum,
+  addCacheHeader,
+} from "../../infrastructure/cache";
 
 /**
  * Web album routes for serving HTML and static assets
@@ -23,7 +27,30 @@ export const createWebAlbumRoutes = () => {
       return fail(c, "Album ID is required. Please provide ?id=YOUR_ALBUM_ID", 400);
     }
 
-    // Fetch album data using the ViewAlbumService
+    // Try to get cached HTML first (cache key based on lockId)
+    const cacheKey = getCacheKeyAlbum(lockId);
+    const cacheRequest = new Request(`https://cache.memorylocks.internal/${cacheKey}-html`, {
+      method: 'GET'
+    });
+
+    const cache = (caches as any).default as Cache;
+    const cachedHtml = await cache.match(cacheRequest);
+
+    if (cachedHtml) {
+      // Cache hit! Increment scan counter if needed (deferred)
+      if (!isOwner) {
+        const numericLockId = container.services.albums.decodeLockId(lockId);
+        if (numericLockId && ctx) {
+          ctx.waitUntil(
+            container.services.scanCounter.incrementScanAndNotify(numericLockId)
+          );
+        }
+      }
+
+      return addCacheHeader(cachedHtml, true);
+    }
+
+    // Cache miss - fetch album data using the ViewAlbumService
     const result = await container.services.albums.getAlbumData(lockId);
 
     if (!result.ok) {
@@ -64,16 +91,6 @@ export const createWebAlbumRoutes = () => {
       );
     }
 
-    // Increment scan counter for non-owner views (deferred)
-    if (!isOwner) {
-      const numericLockId = container.services.albums.decodeLockId(lockId);
-      if (numericLockId && ctx) {
-        ctx.waitUntil(
-          container.services.scanCounter.incrementScanAndNotify(numericLockId)
-        );
-      }
-    }
-
     // Fetch the HTML template from the assets binding
     const assetResponse = await c.env.ASSETS.fetch(
       new Request("http://assets/index.html")
@@ -101,7 +118,31 @@ export const createWebAlbumRoutes = () => {
       "connect-src 'self'"
     );
 
-    return c.html(html);
+    // Cache the HTML response for 10 minutes
+    const ttlSeconds = 600;
+    const htmlResponse = new Response(html, {
+      status: 200,
+      headers: {
+        "Content-Type": "text/html; charset=utf-8",
+        "Cache-Control": `public, max-age=${ttlSeconds}`,
+        "X-Cache": "MISS",
+      },
+    });
+
+    // Store in cache (async, don't await)
+    ctx?.waitUntil(cache.put(cacheRequest, htmlResponse.clone()));
+
+    // Increment scan counter for non-owner views (deferred)
+    if (!isOwner) {
+      const numericLockId = container.services.albums.decodeLockId(lockId);
+      if (numericLockId && ctx) {
+        ctx.waitUntil(
+          container.services.scanCounter.incrementScanAndNotify(numericLockId)
+        );
+      }
+    }
+
+    return htmlResponse;
   });
 
   // Serve static assets (CSS, JS, images, audio, etc.)

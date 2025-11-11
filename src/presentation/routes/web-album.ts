@@ -15,17 +15,14 @@ import {
 export const createWebAlbumRoutes = () => {
   const router = new Hono<{ Bindings: EnvBindings; Variables: AppVariables }>();
 
-  // Only handle requests for album.memorylocks.com
-  router.use("/*", async (c, next) => {
-    const host = c.req.header("host");
-    if (host === "album.memorylocks.com") {
-      await next();
-    }
-    // If not album host, skip these routes (let other routes handle it)
-  });
-
   // Serve album HTML with server-side rendered data
   router.get("/", async (c) => {
+    // Only handle requests for album.memorylocks.com
+    const host = c.req.header("host");
+    if (host !== "album.memorylocks.com") {
+      return; // Let other routes handle it
+    }
+
     const lockId = c.req.query("id");
     const isOwner = c.req.query("isOwner") === "true";
     const container = getContainer(c);
@@ -156,6 +153,12 @@ export const createWebAlbumRoutes = () => {
 
   // Serve static assets (CSS, JS, images, audio, etc.)
   router.get("/*", async (c) => {
+    // Only handle requests for album.memorylocks.com
+    const host = c.req.header("host");
+    if (host !== "album.memorylocks.com") {
+      return; // Let other routes handle it
+    }
+
     const url = new URL(c.req.url);
     const assetPath = url.pathname;
 

@@ -109,8 +109,8 @@ export const createWebAlbumRoutes = () => {
       window.IS_OWNER = ${isOwner};
     </script>`;
 
-    // Insert the script before the closing </head> tag
-    html = html.replace("</head>", `${albumDataScript}\n  </head>`);
+    // Insert the script before the closing </head> tag (use regex to handle any whitespace)
+    html = html.replace(/\s*<\/head>/, `${albumDataScript}\n  </head>`);
 
     // Update CSP to remove api.memorylocks.com from connect-src (no longer needed)
     html = html.replace(

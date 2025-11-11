@@ -15,6 +15,15 @@ import {
 export const createWebAlbumRoutes = () => {
   const router = new Hono<{ Bindings: EnvBindings; Variables: AppVariables }>();
 
+  // Only handle requests for album.memorylocks.com
+  router.use("/*", async (c, next) => {
+    const host = c.req.header("host");
+    if (host === "album.memorylocks.com") {
+      await next();
+    }
+    // If not album host, skip these routes (let other routes handle it)
+  });
+
   // Serve album HTML with server-side rendered data
   router.get("/", async (c) => {
     const lockId = c.req.query("id");

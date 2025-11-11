@@ -53,19 +53,10 @@ const buildApp = (config: AppConfig) => {
   app.use("*", secureHeaders());
   app.use("*", requestLogger());
 
-  // Domain-based routing: serve web album for album.memorylocks.com
-  app.use("*", async (c, next) => {
-    const host = c.req.header("host");
-    if (host === "album.memorylocks.com") {
-      // Route to web album handler
-      const webAlbumRouter = createWebAlbumRoutes();
-      return webAlbumRouter.fetch(c.req.raw, c.env, c.executionCtx);
-    }
-    // For api.memorylocks.com or other hosts, continue to API routes
-    await next();
-  });
+  // Web album routes for album.memorylocks.com (has access to container middleware above)
+  app.route("/", createWebAlbumRoutes());
 
-  // API routes (for api.memorylocks.com)
+  // API routes (for api.memorylocks.com and other hosts)
   app.route("/", createSystemRoutes());
   app.route("/users", createUserRoutes(config));
   app.route("/locks", createLockRoutes(config));

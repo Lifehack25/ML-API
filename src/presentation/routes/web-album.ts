@@ -33,33 +33,15 @@ export const createWebAlbumRoutes = () => {
       return fail(c, "Album ID is required. Please provide ?id=YOUR_ALBUM_ID", 400);
     }
 
-    // Try to get cached HTML first (cache key based on lockId)
-    const cacheKey = getCacheKeyAlbum(lockId);
-    const cacheRequest = new Request(`https://cache.memorylocks.internal/${cacheKey}-html`, {
-      method: 'GET'
-    });
+    console.log(`[Web Album] Request for lockId: ${lockId}, isOwner: ${isOwner}, host: ${host}`);
 
-    const cache = (caches as any).default as Cache;
-    const cachedHtml = await cache.match(cacheRequest);
-
-    if (cachedHtml) {
-      // Cache hit! Increment scan counter if needed (deferred)
-      if (!isOwner) {
-        const numericLockId = container.services.albums.decodeLockId(lockId);
-        if (numericLockId && ctx) {
-          ctx.waitUntil(
-            container.services.scanCounter.incrementScanAndNotify(numericLockId)
-          );
-        }
-      }
-
-      return addCacheHeader(cachedHtml, true);
-    }
-
-    // Cache miss - fetch album data using the ViewAlbumService
+    // Fetch album data using the ViewAlbumService
     const result = await container.services.albums.getAlbumData(lockId);
 
+    console.log(`[Web Album] Album data fetch result: ok=${result.ok}`);
+
     if (!result.ok) {
+      console.log(`[Web Album] Error fetching album: ${result.error.message}`);
       return c.html(
         `<!DOCTYPE html>
 <html lang="en">
@@ -108,6 +90,8 @@ export const createWebAlbumRoutes = () => {
 
     let html = await assetResponse.text();
 
+    console.log(`[Web Album] Fetched HTML template, length: ${html.length}`);
+
     // Inject album data into the HTML
     const albumDataScript = `
     <script>
@@ -115,8 +99,14 @@ export const createWebAlbumRoutes = () => {
       window.IS_OWNER = ${isOwner};
     </script>`;
 
+    console.log(`[Web Album] Album data script length: ${albumDataScript.length}`);
+
     // Insert the script before the closing </head> tag (use regex to handle any whitespace)
+    const beforeReplace = html.length;
     html = html.replace(/\s*<\/head>/, `${albumDataScript}\n  </head>`);
+    const afterReplace = html.length;
+
+    console.log(`[Web Album] HTML injection: before=${beforeReplace}, after=${afterReplace}, injected=${afterReplace > beforeReplace}`);
 
     // Update CSP to remove api.memorylocks.com from connect-src (no longer needed)
     html = html.replace(
@@ -124,19 +114,7 @@ export const createWebAlbumRoutes = () => {
       "connect-src 'self'"
     );
 
-    // Cache the HTML response for 10 minutes
-    const ttlSeconds = 600;
-    const htmlResponse = new Response(html, {
-      status: 200,
-      headers: {
-        "Content-Type": "text/html; charset=utf-8",
-        "Cache-Control": `public, max-age=${ttlSeconds}`,
-        "X-Cache": "MISS",
-      },
-    });
-
-    // Store in cache (async, don't await)
-    ctx?.waitUntil(cache.put(cacheRequest, htmlResponse.clone()));
+    console.log(`[Web Album] Returning HTML response, final length: ${html.length}`);
 
     // Increment scan counter for non-owner views (deferred)
     if (!isOwner) {
@@ -148,7 +126,18 @@ export const createWebAlbumRoutes = () => {
       }
     }
 
-    return htmlResponse;
+    // Return HTML without caching for now (debugging)
+    return new Response(html, {
+      status: 200,
+      headers: {
+        "Content-Type": "text/html; charset=utf-8",
+        "Cache-Control": "no-cache, no-store, must-revalidate, private",
+        "Pragma": "no-cache",
+        "Expires": "0",
+        "X-Cache": "DISABLED",
+        "X-Debug": "Worker-Executed",
+      },
+    });
   });
 
   // Serve static assets (CSS, JS, images, audio, etc.)

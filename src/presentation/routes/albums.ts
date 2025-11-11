@@ -20,7 +20,7 @@ export const createAlbumRoutes = (config: AppConfig) => {
   // This endpoint does NOT increment scan counts (only for app usage)
   router.get(
     "/:hashedId",
-    jwt({ secret: config.jwtSecret, alg: "HS256" }),
+    jwt({ secret: config.jwt.secret, alg: "HS256" }),
     setUserContext(),
     async (c) => {
       const hashedId = c.req.param("hashedId");

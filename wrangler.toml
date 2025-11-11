@@ -32,7 +32,7 @@ id = "68c9b0be5f2743eba3b7394948b162e2"
 # Cron triggers for background jobs
 [triggers]
 crons = [
-  "*/15 * * * *"    # Every 15 minutes: process Cloudflare cleanup jobs
+  "0 */12 * * *"    # Every 12 hours: process Cloudflare cleanup jobs
 ]
 
 # Workers Assets for serving web album static files

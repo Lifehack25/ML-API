@@ -1,4 +1,4 @@
-import { sqliteTable, text, integer, index } from "drizzle-orm/sqlite-core";
+import { sqliteTable, text, integer, index, uniqueIndex } from "drizzle-orm/sqlite-core";
 import { sql } from "drizzle-orm";
 
 export const cleanupJobs = sqliteTable(
@@ -21,13 +21,13 @@ export const cleanupJobs = sqliteTable(
       .default(sql`CURRENT_TIMESTAMP`),
   },
   (table) => ({
-    cloudflareIdIdx: index("idx_cleanup_jobs_cloudflare_id").on(
-      table.cloudflare_id
-    ),
     statusRetryIdx: index("idx_cleanup_jobs_status_retry").on(
       table.status,
       table.next_retry_at
     ),
+    uniqueCloudflareIdIdx: uniqueIndex(
+      "idx_cleanup_jobs_unique_cloudflare_id"
+    ).on(table.cloudflare_id),
   })
 );
 

@@ -8,7 +8,7 @@ export const users = sqliteTable(
     name: text("name"),
     email: text("email"),
     phone_number: text("phone_number"),
-    auth_provider: text("auth_provider").notNull(),
+    auth_provider: text("auth_provider").notNull().default(""),
     provider_id: text("provider_id"),
     email_verified: integer("email_verified", { mode: "boolean" })
       .notNull()
@@ -25,7 +25,7 @@ export const users = sqliteTable(
   },
   (table) => ({
     emailIdx: index("idx_users_email").on(table.email),
-    phoneIdx: index("idx_users_phone_number").on(table.phone_number),
+    phoneIdx: index("idx_users_phone").on(table.phone_number),
     providerIdx: index("idx_users_provider").on(
       table.auth_provider,
       table.provider_id

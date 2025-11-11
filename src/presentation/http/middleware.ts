@@ -1,7 +1,6 @@
 import type { Context, MiddlewareHandler } from "hono";
 import type { AppConfig } from "../../config/env";
 import { fail } from "./responses";
-import { generateIdempotencyKey } from "../../infrastructure/idempotency";
 
 // Rate limiting is now handled by Cloudflare Rate Limiting Rules (configured in Cloudflare Dashboard)
 // Previous in-memory rate limiter removed in favor of edge-native solution
@@ -68,9 +67,7 @@ export const allowPublic = (predicate: (c: Context) => boolean, middleware: Midd
  * Checks for existing idempotency key and returns cached response if found.
  * Otherwise, processes the request and caches the response.
  *
- * Key source priority:
- * 1. Idempotency-Key header (client-supplied)
- * 2. Auto-generated UUID v4
+ * REQUIRES client to send Idempotency-Key header. Returns 400 if missing.
  *
  * TTL: 15 minutes
  *
@@ -87,8 +84,12 @@ export const idempotencyMiddleware: MiddlewareHandler = async (c, next) => {
   const container = c.get("container");
   const idempotencyService = container.idempotencyService;
 
-  // Extract or generate idempotency key
-  const key = c.req.header("Idempotency-Key") || generateIdempotencyKey();
+  // Require client to provide idempotency key
+  const key = c.req.header("Idempotency-Key");
+  if (!key) {
+    return fail(c, "Idempotency-Key header is required", 400);
+  }
+
   const endpoint = c.req.path;
 
   // Check for existing result

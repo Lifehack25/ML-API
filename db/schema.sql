@@ -70,9 +70,10 @@ CREATE INDEX idx_users_provider ON users(auth_provider, provider_id);
 CREATE INDEX idx_locks_user_id ON locks(user_id);
 CREATE INDEX idx_media_objects_lock_id ON media_objects(lock_id);
 CREATE INDEX idx_media_objects_display_order ON media_objects(lock_id, display_order);
+CREATE UNIQUE INDEX idx_media_objects_cloudflare_id ON media_objects(cloudflare_id);
 
 -- Unique constraint: Only one main image per lock
 -- Partial index only indexes rows where is_main_picture = TRUE
-CREATE UNIQUE INDEX idx_media_one_main_per_lock ON media_objects(lock_id) WHERE is_main_picture = TRUE;
+CREATE UNIQUE INDEX idx_media_one_main_image ON media_objects(lock_id) WHERE is_main_picture = TRUE;
 CREATE INDEX idx_cleanup_jobs_status_retry ON cloudflare_cleanup_jobs(status, next_retry_at);
-CREATE INDEX idx_cleanup_jobs_cloudflare_id ON cloudflare_cleanup_jobs(cloudflare_id);
+CREATE UNIQUE INDEX idx_cleanup_jobs_unique_cloudflare_id ON cloudflare_cleanup_jobs(cloudflare_id);

@@ -12,40 +12,47 @@ export class CleanupJobRepository {
 
   /**
    * Schedule a new cleanup job for a Cloudflare media asset.
-   * Should be called when media deletion fails or within a transaction when deleting from DB.
+   * Idempotent: if a job already exists for this cloudflare_id, returns existing job.
+   * Uses unique constraint on cloudflare_id to prevent duplicates.
    */
   async create(request: CreateCleanupJobRequest): Promise<CleanupJob> {
     const now = new Date().toISOString();
-
-    // Check for duplicate (idempotency)
-    const existing = await this.findByCloudflareId(request.cloudflare_id);
-    if (existing && existing.status === "pending") {
-      return existing; // Already scheduled
-    }
 
     // Calculate next retry time (1 minute from now)
     const nextRetryDate = new Date();
     nextRetryDate.setMinutes(nextRetryDate.getMinutes() + 1);
     const nextRetryAt = nextRetryDate.toISOString();
 
-    const result = await this.db
-      .insert(cleanupJobs)
-      .values({
-        cloudflare_id: request.cloudflare_id,
-        media_type: request.media_type,
-        retry_count: 0,
-        next_retry_at: nextRetryAt,
-        status: "pending",
-        created_at: now,
-        updated_at: now,
-      })
-      .returning();
+    try {
+      // Try to insert - unique constraint prevents duplicates
+      const result = await this.db
+        .insert(cleanupJobs)
+        .values({
+          cloudflare_id: request.cloudflare_id,
+          media_type: request.media_type,
+          retry_count: 0,
+          next_retry_at: nextRetryAt,
+          status: "pending",
+          created_at: now,
+          updated_at: now,
+        })
+        .returning();
 
-    if (!result[0]) {
-      throw new Error("Failed to create cleanup job");
+      if (!result[0]) {
+        throw new Error("Failed to create cleanup job");
+      }
+
+      return result[0];
+    } catch (error) {
+      // If unique constraint violation, fetch and return existing job
+      if (error instanceof Error && error.message.includes("UNIQUE constraint failed")) {
+        const existing = await this.findByCloudflareId(request.cloudflare_id);
+        if (existing) {
+          return existing;
+        }
+      }
+      throw error;
     }
-
-    return result[0];
   }
 
   async findById(id: number): Promise<CleanupJob | null> {
@@ -192,4 +199,5 @@ export class CleanupJobRepository {
     // In production, you might want to query count before deleting if needed
     return 0;
   }
+
 }

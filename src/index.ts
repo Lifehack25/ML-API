@@ -12,6 +12,7 @@ import { createUserRoutes } from "./presentation/routes/users";
 import { createLockRoutes } from "./presentation/routes/locks";
 import { createMediaObjectRoutes } from "./presentation/routes/mediaObjects";
 import { createAlbumRoutes } from "./presentation/routes/albums";
+import { createWebAlbumRoutes } from "./presentation/routes/web-album";
 import { createPushNotificationRoutes } from "./presentation/routes/pushNotifications";
 import { processCleanupJobs } from "./jobs/process-cleanup-jobs";
 
@@ -37,7 +38,7 @@ const buildApp = (config: AppConfig) => {
         if (!origin) return "*";
 
         const allowedOrigins = [
-          "https://album.memorylocks.com",
+          // album.memorylocks.com removed - now same-origin (served by same worker)
           // Allow localhost in development for testing
           ...(config.environment === "development" ? ["http://localhost:3000"] : []),
         ];
@@ -52,13 +53,25 @@ const buildApp = (config: AppConfig) => {
   app.use("*", secureHeaders());
   app.use("*", requestLogger());
 
+  // Domain-based routing: serve web album for album.memorylocks.com
+  app.use("*", async (c, next) => {
+    const host = c.req.header("host");
+    if (host === "album.memorylocks.com") {
+      // Route to web album handler
+      const webAlbumRouter = createWebAlbumRoutes();
+      return webAlbumRouter.fetch(c.req.raw, c.env, c.executionCtx);
+    }
+    // For api.memorylocks.com or other hosts, continue to API routes
+    await next();
+  });
+
+  // API routes (for api.memorylocks.com)
   app.route("/", createSystemRoutes());
   app.route("/users", createUserRoutes(config));
   app.route("/locks", createLockRoutes(config));
   app.route("/media-objects", createMediaObjectRoutes(config));
 
-  const albumRoutes = createAlbumRoutes();
-  app.route("/album", albumRoutes);
+  app.route("/album", createAlbumRoutes(config));
 
   app.route("/push-notifications", createPushNotificationRoutes(config));
 

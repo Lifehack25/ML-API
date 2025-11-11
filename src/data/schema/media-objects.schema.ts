@@ -35,11 +35,14 @@ export const mediaObjects = sqliteTable(
       table.lock_id,
       table.display_order
     ),
+    // Ensure each Cloudflare asset is referenced at most once
+    cloudflareIdUniqueIdx: uniqueIndex("idx_media_objects_cloudflare_id").on(
+      table.cloudflare_id
+    ),
     // Unique constraint: only one main picture per lock
-    mainPictureIdx: uniqueIndex("idx_media_objects_main_picture").on(
-      table.lock_id,
-      table.is_main_picture
-    ).where(sql`${table.is_main_picture} = 1`),
+    mainPictureIdx: uniqueIndex("idx_media_one_main_image")
+      .on(table.lock_id)
+      .where(sql`${table.is_main_picture} = 1`),
   })
 );
 

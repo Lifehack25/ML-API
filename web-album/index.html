@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="author" content="Pontus d'Orsay" />
+    <title>Memory Locks Album</title>
+    
+    <!-- Security headers -->
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://unpkg.com https://cdn.jsdelivr.net https://static.cloudflareinsights.com https://www.googletagmanager.com https://*.google-analytics.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdn.jsdelivr.net; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https://imagedelivery.net https://media.memorylocks.com https://videodelivery.net https://*.cloudflarestream.com https://www.google-analytics.com https://www.googletagmanager.com; connect-src 'self' https://api.memorylocks.com https://db.memorylocks.com https://videodelivery.net https://lottie.host https://cloudflareinsights.com https://unpkg.com https://cdn.jsdelivr.net https://www.google-analytics.com https://*.google-analytics.com https://*.analytics.google.com; media-src 'self' data: https://videodelivery.net https://*.cloudflarestream.com; frame-src https://www.googletagmanager.com; object-src 'none'; base-uri 'self'; form-action 'self';" />
+    <meta http-equiv="X-Content-Type-Options" content="nosniff" />
+    <meta http-equiv="X-XSS-Protection" content="1; mode=block" />
+    <meta name="referrer" content="strict-origin-when-cross-origin" />
+    <link rel="shortcut icon" href="Resources/favicon.webp?v=2" type="image/webp" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Courgette&family=Dancing+Script:wght@400..700&display=swap"
+      rel="stylesheet"
+    />
+    <script
+    src="https://unpkg.com/@dotlottie/player-component@2.7.12/dist/dotlottie-player.mjs"
+    type="module"
+    crossorigin="anonymous"
+    referrerpolicy="no-referrer"></script>
+    <link rel="stylesheet" href="style.css" />
+
+    <!-- GLightbox CSS -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/glightbox/dist/css/glightbox.min.css" crossorigin="anonymous" referrerpolicy="no-referrer" />
+
+    <!-- HLS.js for video streaming -->
+    <script src="https://cdn.jsdelivr.net/npm/hls.js@1.5.15/dist/hls.min.js" crossorigin="anonymous" referrerpolicy="no-referrer" defer></script>
+
+    <!-- GLightbox JS -->
+    <script src="https://cdn.jsdelivr.net/npm/glightbox/dist/js/glightbox.min.js" crossorigin="anonymous" referrerpolicy="no-referrer" defer></script>
+
+      <!-- Google Tag Manager -->
+      <script>
+          (function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start': new Date().getTime(),event:'gtm.js'});
+          var f=d.getElementsByTagName(s)[0], j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';
+          j.async=true;j.src= 'https://www.googletagmanager.com/gtm.js?id='+i+dl;f.parentNode.insertBefore(j,f);
+          })(window,document,'script','dataLayer','GTM-KN78P79M');
+      </script>
+      <!-- End Google Tag Manager -->
+      
+    <script src="script.js" defer></script>
+  </head>
+  <body>
+  
+  <!-- Google Tag Manager (noscript) -->
+  <noscript><iframe src="https://www.googletagmanager.com/ns.html?id=GTM-KN78P79M"
+                    height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
+  <!-- End Google Tag Manager (noscript) -->
+  
+    <!-- SVG clipPath definition -->
+    <svg
+      style="position: absolute; width: 0; height: 0; overflow: hidden;"
+      aria-hidden="true"
+      focusable="false"
+    >
+      <defs>
+        <clipPath id="curve" clipPathUnits="objectBoundingBox">
+          <path d="M0,0 H1 V0.8667 C0.8,0.9444 0.2,0.9444 0,0.8667 Z" />
+        </clipPath>
+      </defs>
+    </svg>
+
+    <header class="curved-header">
+      <div class="play-button-container">
+        <button
+          class="play-button pulsating"
+          id="playButton"
+          aria-label="Start Slideshow">
+          <span class="play-icon" id="playIcon">▶</span>
+        </button>
+      </div>
+    </header>
+
+    <main>
+      <h1 id="albumTitle" class="title"></h1>
+      <hr class="divider" />
+      <p class="sealdate">
+        <span>
+          <dotlottie-player
+            id="seal-icon"
+            class="seal-icon"
+            src="https://lottie.host/e7bc1d8a-c38a-4cdc-a9c4-0809f3f3b07c/cxFqPdXHE0.lottie"
+            background="transparent"
+            speed="1"
+            loop
+            autoplay
+            style="width: auto; height: 125px; vertical-align: middle;"
+          ></dotlottie-player>
+          <span id="seal-text"></span>
+        </span>
+      </p>      
+      <div class="grid-container"></div>
+    </main>
+
+    <footer>
+      <p class="promo-text">
+        Get yours at
+        <a
+          class="footer-button"
+          href="https://memorylocks.com"
+          target="_blank"
+          rel="noopener">
+          MemoryLocks.com
+        </a>
+      </p>
+    </footer>
+  </body>
+</html>

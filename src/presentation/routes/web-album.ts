@@ -167,7 +167,7 @@ export const createWebAlbumRoutes = () => {
       status: 200,
       headers: {
         "Content-Type": "text/html; charset=utf-8",
-        "Cache-Control": "public, max-age=43200, s-maxage=43200", // 12 hours
+        "Cache-Control": "public, max-age=86400, s-maxage=86400", // 24 hours
         "X-Cache-Status": "MISS", // Will be HIT on subsequent requests from edge
       },
     });

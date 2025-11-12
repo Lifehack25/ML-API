@@ -72,4 +72,6 @@ export interface CreateUserRequest {
   phoneNumber?: string | null;
   authProvider?: string | null;
   providerId?: string | null;
+  emailVerified?: boolean;
+  phoneVerified?: boolean;
 }

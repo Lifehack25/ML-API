@@ -5,7 +5,7 @@ import { z } from "zod";
 import type { EnvBindings } from "../../common/bindings";
 import type { AppVariables, ServiceContainer } from "../../common/context";
 import type { AppConfig } from "../../config/env";
-import { respondFromService, ok, fail } from "../http/responses";
+import type { ApiError } from "../http/responses";
 import { getContainer, getUserId } from "../http/context";
 import { setUserContext, idempotencyMiddleware } from "../http/middleware";
 import { booleanQuery, requireNumericParam, validateJson } from "../http/validation";
@@ -95,7 +95,15 @@ export const createUserRoutes = (config: AppConfig) => {
     async (c) => {
       const payload = c.req.valid("json") as SendCodeRequest;
       const result = await getService(c).services.auth.sendVerificationCode(payload);
-      return respondFromService(c, result);
+      if (result.ok) {
+        return c.json(result.data, result.status ?? 200);
+      }
+      const errorResponse: ApiError = {
+        error: result.error.message,
+        code: result.error.code,
+        details: result.error.details,
+      };
+      return c.json(errorResponse, result.status ?? 400);
     }
   );
 
@@ -106,7 +114,15 @@ export const createUserRoutes = (config: AppConfig) => {
     async (c) => {
       const payload = c.req.valid("json") as { isEmail: boolean; identifier: string };
       const result = await getService(c).services.users.resendTwilioCode(payload.isEmail, payload.identifier);
-      return respondFromService(c, result);
+      if (result.ok) {
+        return c.json(result.data, result.status ?? 200);
+      }
+      const errorResponse: ApiError = {
+        error: result.error.message,
+        code: result.error.code,
+        details: result.error.details,
+      };
+      return c.json(errorResponse, result.status ?? 400);
     }
   );
 
@@ -118,7 +134,15 @@ export const createUserRoutes = (config: AppConfig) => {
     async (c) => {
       const payload = c.req.valid("json") as VerifyCodeRequest;
       const result = await getService(c).services.auth.verifyCode(payload);
-      return respondFromService(c, result);
+      if (result.ok) {
+        return c.json(result.data, result.status ?? 200);
+      }
+      const errorResponse: ApiError = {
+        error: result.error.message,
+        code: result.error.code,
+        details: result.error.details,
+      };
+      return c.json(errorResponse, result.status ?? 400);
     }
   );
 
@@ -129,7 +153,15 @@ export const createUserRoutes = (config: AppConfig) => {
     async (c) => {
       const payload = c.req.valid("json") as RefreshTokenRequest;
       const result = await getService(c).services.auth.refreshTokens(payload);
-      return respondFromService(c, result);
+      if (result.ok) {
+        return c.json(result.data, result.status ?? 200);
+      }
+      const errorResponse: ApiError = {
+        error: result.error.message,
+        code: result.error.code,
+        details: result.error.details,
+      };
+      return c.json(errorResponse, result.status ?? 400);
     }
   );
 
@@ -141,7 +173,15 @@ export const createUserRoutes = (config: AppConfig) => {
     async (c) => {
       const payload = c.req.valid("json") as AppleAuthRequest;
       const result = await getService(c).services.auth.verifyApple(payload);
-      return respondFromService(c, result);
+      if (result.ok) {
+        return c.json(result.data, result.status ?? 200);
+      }
+      const errorResponse: ApiError = {
+        error: result.error.message,
+        code: result.error.code,
+        details: result.error.details,
+      };
+      return c.json(errorResponse, result.status ?? 400);
     }
   );
 
@@ -153,7 +193,15 @@ export const createUserRoutes = (config: AppConfig) => {
     async (c) => {
       const payload = c.req.valid("json") as { idToken: string };
       const result = await getService(c).services.auth.verifyGoogle(payload);
-      return respondFromService(c, result);
+      if (result.ok) {
+        return c.json(result.data, result.status ?? 200);
+      }
+      const errorResponse: ApiError = {
+        error: result.error.message,
+        code: result.error.code,
+        details: result.error.details,
+      };
+      return c.json(errorResponse, result.status ?? 400);
     }
   );
 
@@ -163,7 +211,15 @@ export const createUserRoutes = (config: AppConfig) => {
   router.get("/me", async (c) => {
     const userId = getUserId(c);
     const result = await getService(c).services.users.getProfile(userId);
-    return respondFromService(c, result);
+      if (result.ok) {
+        return c.json(result.data, result.status ?? 200);
+      }
+      const errorResponse: ApiError = {
+        error: result.error.message,
+        code: result.error.code,
+        details: result.error.details,
+      };
+      return c.json(errorResponse, result.status ?? 400);
   });
 
   // Update the authenticated user's display name.
@@ -174,7 +230,15 @@ export const createUserRoutes = (config: AppConfig) => {
       const userId = getUserId(c);
       const payload = c.req.valid("json") as UpdateUserNameRequest;
       const result = await getService(c).services.users.updateName(userId, payload);
-      return respondFromService(c, result);
+      if (result.ok) {
+        return c.json(result.data, result.status ?? 200);
+      }
+      const errorResponse: ApiError = {
+        error: result.error.message,
+        code: result.error.code,
+        details: result.error.details,
+      };
+      return c.json(errorResponse, result.status ?? 400);
     }
   );
 
@@ -187,7 +251,15 @@ export const createUserRoutes = (config: AppConfig) => {
       const userId = getUserId(c);
       const payload = c.req.valid("json") as Omit<VerifyIdentifierRequest, "userId">;
       const result = await getService(c).services.users.verifyIdentifier({ ...payload, userId });
-      return respondFromService(c, result);
+      if (result.ok) {
+        return c.json(result.data, result.status ?? 200);
+      }
+      const errorResponse: ApiError = {
+        error: result.error.message,
+        code: result.error.code,
+        details: result.error.details,
+      };
+      return c.json(errorResponse, result.status ?? 400);
     }
   );
 
@@ -199,7 +271,15 @@ export const createUserRoutes = (config: AppConfig) => {
       const userId = getUserId(c);
       const payload = c.req.valid("json") as UpdateDeviceTokenRequest;
       const result = await getService(c).services.users.updateDeviceToken(userId, payload);
-      return respondFromService(c, result);
+      if (result.ok) {
+        return c.json(result.data, result.status ?? 200);
+      }
+      const errorResponse: ApiError = {
+        error: result.error.message,
+        code: result.error.code,
+        details: result.error.details,
+      };
+      return c.json(errorResponse, result.status ?? 400);
     }
   );
 
@@ -212,7 +292,15 @@ export const createUserRoutes = (config: AppConfig) => {
       const userId = getUserId(c);
       const { deleteMedia } = c.req.valid("query") as { deleteMedia: boolean };
       const result = await getService(c).services.users.deleteAccount(userId, deleteMedia);
-      return respondFromService(c, result);
+      if (result.ok) {
+        return c.json(result.data, result.status ?? 200);
+      }
+      const errorResponse: ApiError = {
+        error: result.error.message,
+        code: result.error.code,
+        details: result.error.details,
+      };
+      return c.json(errorResponse, result.status ?? 400);
     }
   );
 

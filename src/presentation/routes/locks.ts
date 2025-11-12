@@ -4,7 +4,7 @@ import { jwt } from "hono/jwt";
 import type { EnvBindings } from "../../common/bindings";
 import type { AppVariables } from "../../common/context";
 import type { AppConfig } from "../../config/env";
-import { respondFromService, ok, fail } from "../http/responses";
+import type { ApiError } from "../http/responses";
 import { getContainer, getUserId } from "../http/context";
 import { createLockKeyAuth, setUserContext, idempotencyMiddleware } from "../http/middleware";
 import { z } from "zod";
@@ -22,11 +22,11 @@ const ensureLockOwnership = async (c: Context<{ Bindings: EnvBindings; Variables
   const userId = getUserId(c);
   const lock = await getContainer(c).repositories.locks.findById(lockId);
   if (!lock) {
-    return fail(c, "Lock not found", 404, null);
+    return c.json({ error: "Lock not found" } as ApiError, 404);
   }
 
   if (lock.user_id !== userId) {
-    return fail(c, "Forbidden", 403, null);
+    return c.json({ error: "Forbidden" } as ApiError, 403);
   }
 
   return true;
@@ -75,11 +75,19 @@ export const createLockRoutes = (config: AppConfig) => {
       const { userId: requestedUserId } = c.req.valid("param") as { userId: number };
 
       if (requestedUserId !== getUserId(c)) {
-        return fail(c, "Forbidden", 403, []);
+        return c.json({ error: "Forbidden" } as ApiError, 403);
       }
 
       const result = await getContainer(c).services.locks.getUserLocks(requestedUserId);
-      return respondFromService(c, result);
+      if (result.ok) {
+        return c.json(result.data, result.status ?? 200);
+      }
+      const errorResponse: ApiError = {
+        error: result.error.message,
+        code: result.error.code,
+        details: result.error.details,
+      };
+      return c.json(errorResponse, result.status ?? 400);
     }
   );
 
@@ -96,7 +104,15 @@ export const createLockRoutes = (config: AppConfig) => {
         return ownership;
       }
       const result = await getContainer(c).services.locks.updateLockName(payload);
-      return respondFromService(c, result);
+      if (result.ok) {
+        return c.json(result.data, result.status ?? 200);
+      }
+      const errorResponse: ApiError = {
+        error: result.error.message,
+        code: result.error.code,
+        details: result.error.details,
+      };
+      return c.json(errorResponse, result.status ?? 400);
     }
   );
 
@@ -113,7 +129,15 @@ export const createLockRoutes = (config: AppConfig) => {
         return ownership;
       }
       const result = await getContainer(c).services.locks.toggleSealDate(lockId);
-      return respondFromService(c, result);
+      if (result.ok) {
+        return c.json(result.data, result.status ?? 200);
+      }
+      const errorResponse: ApiError = {
+        error: result.error.message,
+        code: result.error.code,
+        details: result.error.details,
+      };
+      return c.json(errorResponse, result.status ?? 400);
     }
   );
 
@@ -130,7 +154,15 @@ export const createLockRoutes = (config: AppConfig) => {
         return ownership;
       }
       const result = await getContainer(c).services.locks.upgradeStorage(lockId);
-      return respondFromService(c, result);
+      if (result.ok) {
+        return c.json(result.data, result.status ?? 200);
+      }
+      const errorResponse: ApiError = {
+        error: result.error.message,
+        code: result.error.code,
+        details: result.error.details,
+      };
+      return c.json(errorResponse, result.status ?? 400);
     }
   );
 
@@ -151,7 +183,15 @@ export const createLockRoutes = (config: AppConfig) => {
         getUserId(c),
         hashedLockId.trim()
       );
-      return respondFromService(c, result);
+      if (result.ok) {
+        return c.json(result.data, result.status ?? 200);
+      }
+      const errorResponse: ApiError = {
+        error: result.error.message,
+        code: result.error.code,
+        details: result.error.details,
+      };
+      return c.json(errorResponse, result.status ?? 400);
     }
   );
 
@@ -165,7 +205,7 @@ export const createLockRoutes = (config: AppConfig) => {
     async (c) => {
       const payload = c.req.valid("json") as PublishMetadataRequest;
       if (!payload?.lockId || !Number.isFinite(payload.lockId)) {
-        return fail(c, "Invalid lock ID", 400, null);
+        return c.json({ error: "Invalid lock ID" } as ApiError, 400);
       }
       const ownership = await ensureLockOwnership(c, payload.lockId);
       if (ownership !== true) {
@@ -180,7 +220,15 @@ export const createLockRoutes = (config: AppConfig) => {
         await invalidateAlbumCache(hashedId, container.config.cloudflarePurge);
       }
 
-      return respondFromService(c, result);
+      if (result.ok) {
+        return c.json(result.data, result.status ?? 200);
+      }
+      const errorResponse: ApiError = {
+        error: result.error.message,
+        code: result.error.code,
+        details: result.error.details,
+      };
+      return c.json(errorResponse, result.status ?? 400);
     }
   );
 
@@ -195,7 +243,7 @@ export const createLockRoutes = (config: AppConfig) => {
       const file = form.get("file");
       const lockId = Number(form.get("lockId"));
       if (!Number.isFinite(lockId)) {
-        return fail(c, "Invalid lock ID", 400);
+        return c.json({ error: "Invalid lock ID" } as ApiError, 400);
       }
       const displayOrder = Number(form.get("displayOrder")) || 0;
       const isMainImage = form.get("isMainImage") === "true";
@@ -209,7 +257,7 @@ export const createLockRoutes = (config: AppConfig) => {
       }
 
       if (!(file instanceof File)) {
-        return fail(c, "File field is required", 400);
+        return c.json({ error: "File field is required" } as ApiError, 400);
       }
 
       const ownership = await ensureLockOwnership(c, lockId);
@@ -225,7 +273,15 @@ export const createLockRoutes = (config: AppConfig) => {
         durationSeconds,
       });
 
-      return respondFromService(c, result);
+      if (result.ok) {
+        return c.json(result.data, result.status ?? 200);
+      }
+      const errorResponse: ApiError = {
+        error: result.error.message,
+        code: result.error.code,
+        details: result.error.details,
+      };
+      return c.json(errorResponse, result.status ?? 400);
     }
   );
 
@@ -245,10 +301,10 @@ export const createLockRoutes = (config: AppConfig) => {
       const container = getContainer(c);
       const lock = await container.repositories.locks.findById(lockId);
       if (!lock) {
-        return fail(c, "Lock not found", 404, null);
+        return c.json({ error: "Lock not found" } as ApiError, 404);
       }
 
-      return ok(c, mapLockRowToSummary(lock, container.hashids), "Lock retrieved successfully");
+      return c.json(mapLockRowToSummary(lock, container.hashids), 200);
     }
   );
 
@@ -265,7 +321,15 @@ export const createLockRoutes = (config: AppConfig) => {
         return ownership;
       }
       const result = await getContainer(c).services.locks.getValidationData(lockId);
-      return respondFromService(c, result);
+      if (result.ok) {
+        return c.json(result.data, result.status ?? 200);
+      }
+      const errorResponse: ApiError = {
+        error: result.error.message,
+        code: result.error.code,
+        details: result.error.details,
+      };
+      return c.json(errorResponse, result.status ?? 400);
     }
   );
 
@@ -286,15 +350,11 @@ export const createLockRoutes = (config: AppConfig) => {
         createdIds.push(created.id);
       }
 
-      return ok(
-        c,
-        {
-          createdCount: createdIds.length,
-          minId: createdIds[0],
-          maxId: createdIds[createdIds.length - 1],
-        },
-        `Successfully created ${createdIds.length} locks`
-      );
+      return c.json({
+        createdCount: createdIds.length,
+        minId: createdIds[0],
+        maxId: createdIds[createdIds.length - 1],
+      }, 200);
     }
   );
 

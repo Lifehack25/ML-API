@@ -4,7 +4,7 @@ import type { EnvBindings } from "../../common/bindings";
 import type { AppVariables } from "../../common/context";
 import type { AppConfig } from "../../config/env";
 import { getContainer } from "../http/context";
-import { respondFromService } from "../http/responses";
+import type { ApiError } from "../http/responses";
 import { createPushNotificationKeyAuth } from "../http/middleware";
 import { validateBody } from "../http/validation";
 
@@ -24,7 +24,15 @@ export const createPushNotificationRoutes = (config: AppConfig) => {
     if (!validation.success) return validation.response;
 
     const result = await getContainer(c).services.notifications.sendNotification(validation.data);
-    return respondFromService(c, result);
+      if (result.ok) {
+        return c.json(result.data, result.status ?? 200);
+      }
+      const errorResponse: ApiError = {
+        error: result.error.message,
+        code: result.error.code,
+        details: result.error.details,
+      };
+      return c.json(errorResponse, result.status ?? 400);
   });
 
   return router;

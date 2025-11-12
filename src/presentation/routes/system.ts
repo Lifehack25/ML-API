@@ -2,7 +2,7 @@ import { Hono } from "hono";
 import type { Context } from "hono";
 import type { EnvBindings } from "../../common/bindings";
 import type { AppVariables, ServiceContainer } from "../../common/context";
-import { ok } from "../http/responses";
+import type { ApiError } from "../http/responses";
 import { sql } from "drizzle-orm";
 
 export const createSystemRoutes = () => {
@@ -10,19 +10,19 @@ export const createSystemRoutes = () => {
 
   // Public health check - minimal information exposure
   router.get("/public/health", (c) =>
-    ok(c, {
+    c.json({
       Status: "Healthy",
       Version: "1.0.0",
-    })
+    }, 200)
   );
 
   // Root endpoint - public information only
   router.get("/", (c) =>
-    ok(c, {
+    c.json({
       Service: "ML-API",
       Version: "1.0.0",
       Status: "Running",
-    })
+    }, 200)
   );
 
   // Kubernetes-style readiness probe with database connectivity check
@@ -32,30 +32,28 @@ export const createSystemRoutes = () => {
       // Simple database connectivity test using Drizzle
       await container.db.run(sql`SELECT 1`);
 
-      return ok(c, {
+      return c.json({
         Status: "Ready",
         Database: "Connected",
         Version: "1.0.0",
-      });
+      }, 200);
     } catch (error) {
-      return c.json(
-        {
-          Success: false,
+      return c.json({
+        error: "Database connectivity check failed",
+        details: {
           Status: "Not Ready",
           Database: "Disconnected",
-          Message: "Database connectivity check failed",
-        },
-        503
-      );
+        }
+      } as ApiError, 503);
     }
   });
 
   // Kubernetes-style liveness probe
   router.get("/health/live", (c) =>
-    ok(c, {
+    c.json({
       Status: "Alive",
       Version: "1.0.0",
-    })
+    }, 200)
   );
 
   return router;

@@ -4,254 +4,178 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-ML-API is a unified edge-native API for Memory Locks built with Hono and deployed on Cloudflare Workers. It replaces the legacy ASP.NET Core API and database worker, consolidating authentication, lock management, media handling, album operations, and notifications into a single Worker running on Cloudflare's edge network.
+Memory Locks API (ML-API) is a Cloudflare Workers-based edge-native API for managing digital memory locks - physical products with QR codes that unlock photo/video albums. Built with Hono framework, TypeScript, and Cloudflare D1 (SQLite).
 
-## Development Commands
+## Key Commands
 
+### Development
 ```bash
-# Development
-npm run dev              # Start local dev server with wrangler dev --local
-npm run build           # Create deployable bundle (dry run)
-npm run deploy          # Deploy to Cloudflare
+npm run dev              # Local development with Wrangler
+npm run build           # Dry-run deploy to validate build
+npm run lint            # TypeScript type checking (no emit)
+npm test                # Run Vitest tests
+npm run test:watch      # Watch mode for tests
+```
 
-# Quality assurance
-npm run test            # Run Vitest suite
-npm run test:watch      # Run Vitest in watch mode
-npm run lint            # Type-check with TypeScript (tsc --noEmit)
+### Deployment
+Deployment is automated via GitHub Actions. Push to `main` branch to trigger automatic deployment to Cloudflare Workers. Do not use `npm run deploy` directly - let CI/CD handle deployments.
+
+### Database Migrations
+```bash
+wrangler d1 execute DB --remote --file=./db/migrations/XXX_migration_name.sql
+```
+
+### Secrets Management
+Secrets are managed via Wrangler CLI, not in code:
+```bash
+wrangler secret put SECRET_NAME
+wrangler secret list
 ```
 
 ## Architecture
 
-The codebase follows a strict three-tier architecture:
+### Layered Architecture (Clean Architecture-inspired)
 
-### 1. Presentation Layer (`src/presentation/`)
-- **Routes** (`routes/`): Hono route registries for each domain (users, locks, media-objects, albums, push-notifications)
-- **HTTP utilities** (`http/`): Response helpers, validation, middleware, error handling
-- Thin layer that delegates to business services and returns standardized JSON envelopes
+**Presentation Layer** (`src/presentation/`): HTTP handling, routing, validation
+- Routes defined in `src/presentation/routes/`
+- Hono context helpers in `src/presentation/http/context.ts`
+- Middleware (auth, logging, idempotency) in `src/presentation/http/middleware.ts`
+- Response patterns in `src/presentation/http/responses.ts`
 
-### 2. Business Layer (`src/business/`)
-- **Services** (`services/`): Domain services containing all application logic
-  - `UserAuthFlowService`: Authentication, OAuth (Apple/Google), phone verification
-  - `UserService`: User management operations
-  - `LockService`: Lock provisioning, unlocking, metadata changes
-  - `ViewAlbumService`: Album CRUD and media attachment
-  - `ManageMediaService`: Media upload, moderation, Cloudflare Images/Stream
-  - `NotificationService`: FCM push notifications
-- **DTOs** (`dtos/`): Request/response contracts in PascalCase (API format)
-- **Errors** (`errors.ts`): Domain-specific error classes (NotFoundError, ValidationError, etc.)
+**Business Layer** (`src/business/`): Domain logic and services
+- Services coordinate business operations (e.g., `LockService`, `UserAuthFlowService`)
+- DTOs in `src/business/dtos/`
+- Business constants (like milestones) in `src/business/constants/`
 
-### 3. Data Layer (`src/data/`)
-- **Repositories** (`repositories/`): D1 database access (UserRepository, LockRepository, MediaObjectRepository)
-- **Models** (`models/`): D1 row representations (snake_case)
-- **Mappers** (`mappers/`): Transform between snake_case DB models and PascalCase DTOs
+**Data Layer** (`src/data/`): Database access using Drizzle ORM
+- Repositories handle all database queries
+- Mappers convert between database rows and domain models
+- Schema definitions in `src/data/schema/`
+- Transaction wrapper in `src/data/transaction.ts`
 
-### Cross-Cutting Concerns
+**Infrastructure Layer** (`src/infrastructure/`): External service integrations
+- Twilio, Firebase, Cloudflare, Sightengine, Apple/Google OAuth
+- JWT service, image compression, cache invalidation
 
-**Infrastructure** (`src/infrastructure/`): External integrations using Web-standard fetch
-- `twilio.ts`: Twilio Verify for phone verification
-- `firebase.ts`: FCM push notifications
-- `cloudflare.ts`: Cloudflare Images and Stream API
-- `sightengine.ts`: Content moderation
-- `oauth-apple.ts`, `oauth-google.ts`: OAuth token verification
-- `jwt.ts`: JWT signing and validation
+**Common** (`src/common/`): Shared utilities
+- Result types (`ServiceResult<T>`) for error handling
+- Logger, HashIds, idempotency helpers
+- Context creation and dependency injection
 
-**Common** (`src/common/`):
-- `context.ts`: Per-request dependency injection container
-- `result.ts`: ServiceResult<T> discriminated union for service responses
-- `hashids.ts`: Lock identifier encoding/decoding
-- `logger.ts`: Request-scoped logging interface
-- `bindings.ts`: Cloudflare Worker environment bindings types
+### Dependency Injection via ServiceContainer
 
-## Request Lifecycle
+All services, repositories, and infrastructure clients are wired together in `src/common/context.ts` via the `createRequestContext` function. This creates a `ServiceContainer` that is attached to each request via Hono middleware and accessed via `getContainer(c)` in routes.
 
-1. Hono middleware in `src/index.ts` creates a `ServiceContainer` for each request via `createRequestContext()`
-2. The container is stored in Hono context variables (`c.set("container", container)`)
-3. Route handlers extract the container and delegate to business services
-4. Services orchestrate repositories and infrastructure clients, returning `ServiceResult<T>`
-5. Controllers convert results to the Memory Locks JSON envelope: `{ Success, Message, Data }`
-6. Domain errors (from `business/errors.ts`) are caught by `handleError()` and mapped to HTTP status codes
+The container pattern ensures:
+- All dependencies are initialized once per request
+- Configuration is loaded and validated early
+- Easy to mock for testing
+- Type-safe access to all services
 
-## Key Design Patterns
+### Result Pattern
 
-### Per-Request Dependency Injection
-All repositories and services are instantiated per-request in `createRequestContext()` (src/common/context.ts). This eliminates global mutable state and enables request-scoped logging.
+Services return `ServiceResult<T>` types (see `src/common/result.ts`):
+- `ServiceSuccess<T>`: `{ ok: true, data: T, message?, status? }`
+- `ServiceFailure`: `{ ok: false, error: { code, message, details }, status? }`
 
-### ServiceResult Pattern
-Services return `ServiceResult<T>` (src/common/result.ts) instead of throwing exceptions for expected failures:
-```typescript
-const result = await service.doSomething();
-if (!result.ok) {
-  return c.json({ Success: false, Message: result.error.message }, result.status);
-}
-return c.json({ Success: true, Data: result.data }, 200);
-```
+Use `respondFromService` helper in routes to convert ServiceResult to HTTP responses.
 
-### DTOs vs Models
-- **DTOs** (business/dtos/): PascalCase, used in API requests/responses
-- **Models** (data/models/): snake_case, match D1 schema
-- **Mappers** (data/mappers/): Transform between the two representations
+### Dual-Domain Setup
 
-### Response Envelope
-All endpoints return a consistent JSON structure:
-```typescript
-{
-  Success: boolean,
-  Message?: string,
-  Data?: T,
-  Code?: string  // Only on errors
-}
-```
+This worker handles TWO domains with different behaviors:
+- `api.memorylocks.com/*`: API endpoints (routes in `/locks`, `/users`, etc.)
+- `album.memorylocks.com/*`: Web album viewer (static HTML + server-side data injection)
 
-### Transaction Strategy
+Routes are defined in `wrangler.toml` and handled in `src/index.ts`. The web album routes (`src/presentation/routes/web-album.ts`) serve static assets from the `web-album/` directory using Workers Assets binding.
 
-**IMPORTANT**: Cloudflare D1 does NOT support SQL transaction statements (BEGIN/COMMIT/ROLLBACK) in Workers. Use the batch API for atomic multi-statement operations.
+### HashIds for External IDs
 
-#### D1 Batch API (Preferred)
-For atomic multi-statement operations where all parameters are known upfront:
-```typescript
-import { withBatch } from "../../data/transaction";
+Numeric database IDs are never exposed externally. All lock IDs in API responses and URLs are hashed using HashIds (`src/common/hashids.ts`). This provides:
+- Obfuscation of internal IDs
+- Short, URL-safe identifiers
+- Deterministic encoding/decoding
 
-await withBatch(db, (batch) => {
-  batch.add("DELETE FROM media_objects WHERE id = ?", mediaId);
-  batch.add("UPDATE locks SET album_title = ? WHERE id = ?", title, lockId);
-  batch.add("UPDATE users SET email_verified = 1 WHERE id = ?", userId);
-});
-// All statements succeed or all fail (true ACID semantics)
-```
+### Idempotency
 
-**Guarantees**: All-or-nothing atomic execution with automatic rollback on failure.
+The API supports idempotency via `Create-Lock-Key` header for critical operations (e.g., lock creation, media uploads). Implemented in:
+- `src/infrastructure/idempotency.ts`: Core logic using KV namespace
+- `src/presentation/http/middleware.ts`: `idempotencyMiddleware` wrapper
+- Applied per-route basis on mutation endpoints
 
-#### Compensating Transactions
-When batch API can't be used (statement B needs result from statement A):
-```typescript
-// Create user first (returns generated ID)
-const user = await userRepository.create(userData);
+### Authentication
 
-try {
-  // Use batch API for dependent operations
-  await withBatch(db, (batch) => {
-    batch.add("UPDATE users SET email_verified = 1 WHERE id = ?", user.id);
-    batch.add("INSERT INTO user_providers (user_id, provider) VALUES (?, ?)", user.id, provider);
-  });
-} catch (error) {
-  // Compensate: delete the user if linking failed
-  await userRepository.delete(user.id);
-  throw error;
-}
-```
+Three auth flows supported:
+1. **Phone OTP** (Twilio Verify): Sends SMS code, verifies, issues JWT
+2. **Apple Sign-In**: Validates Apple identity token, links to user
+3. **Google OAuth**: Validates Google identity token, links to user
 
-#### Idempotency Protection
-For operations vulnerable to race conditions (user registration, OAuth callbacks):
-```typescript
-import { withIdempotency } from "../../common/idempotency";
+Implemented in `UserAuthFlowService` (`src/business/services/user-auth-flow-service.ts`). JWT tokens are issued via `SessionTokenService` with access/refresh token pattern.
 
-const { isDuplicate, result } = await withIdempotency(
-  env.IDEMPOTENCY_KEYS,
-  `register:${email}`,
-  async () => {
-    return await userService.register(email, password);
-  }
-);
+Routes use `jwt()` middleware from Hono for protected endpoints, then `setUserContext` middleware extracts user ID into Hono context.
 
-if (isDuplicate) {
-  return c.json({ Success: false, Message: "Duplicate request" }, 409);
-}
-```
+### Media Storage & Cleanup
 
-**Note**: OAuth endpoints already have `idempotencyMiddleware` applied automatically.
+Media (images/videos) stored in Cloudflare Images/Stream:
+- Upload flow: `ManageMediaService.handleMediaUpload` validates, compresses (via Sightengine), uploads to Cloudflare
+- Deletion: Creates `cloudflare_cleanup_jobs` records for async retry
+- Cron job (`src/jobs/process-cleanup-jobs.ts`) runs every 12 hours to process pending deletions with exponential backoff
 
-#### When to Use Each Pattern
+### Caching & Invalidation
 
-1. **Batch API** (`withBatch`) - Use when:
-   - All SQL parameters are known before execution
-   - Statements don't depend on results of previous statements
-   - Operations must succeed or fail together atomically
-   - Examples: Album publishing, account deletion, provider linking
+Web albums cached at Cloudflare edge for 24 hours. Cache purging:
+- `src/infrastructure/cloudflare-purge.ts`: Calls Cloudflare API to purge by URL
+- `src/infrastructure/cache-invalidation.ts`: Helper to invalidate album cache
+- Called after metadata changes, media uploads, lock name updates
 
-2. **Compensating Transactions** - Use when:
-   - Statement B needs the result of Statement A (e.g., generated ID)
-   - Can't collect all parameters upfront
-   - Examples: User creation + provider linking, user creation + verification
+### Scan Tracking with Edge Bypass
 
-3. **Idempotency Keys** - Use for:
-   - Preventing duplicate user registrations
-   - OAuth callback race conditions
-   - Critical state changes that shouldn't repeat
+Album scans tracked via `/scan-beacon` endpoint:
+- Lightweight GET request with `no-cache` headers (bypasses edge cache)
+- Uses `ctx.waitUntil()` to increment counter asynchronously
+- `ScanCounterService` handles milestone notifications (50, 100, 500, 1000 scans)
 
-4. **SQL-Level Atomicity** (no wrapper needed) - For:
-   - Single INSERT/UPDATE/DELETE statements
-   - Atomic increments: `UPDATE ... SET count = count + 1`
+## Configuration
 
-#### Legacy withTransaction Function
+Configuration loaded from environment variables in `src/config/env.ts`. Required secrets:
+- `JWT_SECRET`: For signing access/refresh tokens
+- `CREATE_LOCK_API_KEY`: API key for lock creation endpoint (used by manufacturing)
+- `PUSH_NOTIFICATION_KEY`: API key for push notification routes
+- `HASHIDS_SALT`: Salt for HashIds encoding
 
-The `withTransaction()` function still exists for backwards compatibility but does NOT provide true transaction semantics. It's a pass-through wrapper with no atomicity guarantees across multiple statements.
-
-**DO NOT USE** for new code - use `withBatch()` instead.
-
-```typescript
-// ❌ BAD: No atomicity
-await withTransaction(db, async (tx) => {
-  await tx.prepare("INSERT INTO users ...").run();
-  await tx.prepare("UPDATE locks ...").run();
-  // If UPDATE fails, INSERT is NOT rolled back
-});
-
-// ✅ GOOD: True atomicity
-await withBatch(db, (batch) => {
-  batch.add("INSERT INTO users ...", ...params);
-  batch.add("UPDATE locks ...", ...params);
-  // Both succeed or both fail
-});
-```
-
-#### Common Pitfalls
-
-- ❌ Don't try to use BEGIN/COMMIT/ROLLBACK SQL (D1 will reject them)
-- ❌ Don't assume multiple separate `.run()` calls are atomic (they're not)
-- ❌ Don't nest batch() calls (not supported)
-- ✅ Remember: D1 batch API limit is 100 bound parameters per query
-- ✅ Individual D1 statements are always atomic (single INSERT/UPDATE/DELETE)
-
-## Configuration & Bindings
-
-Configuration is loaded from Cloudflare Worker bindings via `loadConfig()` in `src/config/env.ts`.
-
-**Critical bindings** (set in wrangler.toml):
-- `DB`: Cloudflare D1 database instance
-- `CREATE_LOCK_API_KEY`: Secret for bulk lock provisioning endpoint (header: `Create-Lock-Key`)
-- `HASHIDS_SALT`, `HASHIDS_MIN_LENGTH`: Lock ID obfuscation
-- Twilio credentials: `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, `TWILIO_VERIFY_SERVICE_SID`
-- Cloudflare media: `CLOUDFLARE_ACCOUNT_ID`, `CLOUDFLARE_UPLOAD_TOKEN`
+Optional secrets enable features:
+- Twilio: `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, `TWILIO_VERIFY_SERVICE_SID`
+- Cloudflare Media: `CLOUDFLARE_ACCOUNT_ID`, `CLOUDFLARE_UPLOAD_TOKEN`
+- Cloudflare Purge: `CLOUDFLARE_ZONE_ID`, `CLOUDFLARE_PURGE_TOKEN`
 - Firebase: `FIREBASE_SERVICE_ACCOUNT_JSON`
-- JWT: `JWT_ISSUER`, `JWT_AUDIENCE`, `JWT_SECRET`
 - Apple OAuth: `APPLE_BUNDLE_ID`, `APPLE_TEAM_ID`, `APPLE_KEY_ID`, `APPLE_AUTH_KEY_PEM`
 - Google OAuth: `GOOGLE_ANDROID_CLIENT_ID`, `GOOGLE_IOS_CLIENT_ID`
-- Sightengine: `SIGHTENGINE_USER`, `SIGHTENGINE_SECRET`
 
-Update `wrangler.toml` with real credentials before deploying.
+## Database
 
-## Adding New Features
+Cloudflare D1 (SQLite) with Drizzle ORM. Schema is in `db/schema.sql` with migrations in `db/migrations/`.
 
-1. **Data layer**: Create repository methods if new DB queries needed
-2. **Business layer**: Implement service methods with business logic, return `ServiceResult<T>`
-3. **Presentation layer**: Add route handler that calls service and converts result to JSON envelope
-4. **Types**: Add DTOs for request/response contracts, mappers for DB transformations
+Key tables:
+- `users`: User accounts with auth provider info
+- `locks`: Memory lock products (1:1 with physical QR codes)
+- `media_objects`: Photos/videos in locks (foreign key to locks)
+- `cloudflare_cleanup_jobs`: Pending Cloudflare media deletions
 
-Services are auto-wired in `createRequestContext()` when needed by routes.
+**Important**: `display_order` in `media_objects` intentionally allows gaps/duplicates. The mobile app treats collection index as source of truth and rebuilds all display_order values on publish.
+
+Each lock can only have one `is_main_picture = TRUE` enforced by unique partial index.
 
 ## Testing
 
-Tests use Vitest and should mirror the API surface. Currently scaffolded but not fully implemented. When writing tests:
-- Mock dependencies by injecting test implementations into services
-- Use `ServiceResult` pattern for assertions
-- Test both success and failure paths
+Tests use Vitest. Currently no test files in repo - when adding tests, place in `tests/` directory.
 
-## Additional Notes
+## Edge Cases & Quirks
 
-- The Worker uses `wrangler dev --local` for development with a local D1 instance
-- CORS is configured for `http://localhost:3000` and `https://album.memorylocks.com`
-- Rate limiting middleware exists in `presentation/http/middleware.ts`
-- All external HTTP calls use native `fetch` (no Node.js polyfills)
-- Cryptographic operations use WebCrypto APIs (JOSE library for JWT/JWK)
+1. **Album caching**: Web albums are cached for 24 hours at edge. Always invalidate cache after metadata changes via `invalidateAlbumCache()`.
 
-See `docs/ARCHITECTURE.md` for detailed architectural documentation.
+2. **Cron schedule mismatch**: `wrangler.toml` defines cron as `0 */12 * * *` but `src/index.ts` checks for `*/15 * * * *`. Update code to match config.
+
+3. **Storage limits**: Tiered storage limits defined in `src/config/env.ts` storageLimits. Tier 1: 50 images + 60s video. Tier 2: 100 images + 120s video.
+
+4. **Media object deletion**: Never delete media_objects directly - always use `ManageMediaService` to create cleanup jobs for Cloudflare resources.
+
+5. **HashIds are NOT UUIDs**: They're deterministic encodings of numeric IDs. Same ID always produces same hash. Use `hashids.encode(id)` and `hashids.decode(hash)`.

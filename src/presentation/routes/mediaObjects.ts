@@ -6,7 +6,7 @@ import type { AppVariables } from "../../common/context";
 import type { AppConfig } from "../../config/env";
 import { setUserContext, idempotencyMiddleware } from "../http/middleware";
 import { getContainer } from "../http/context";
-import { ok, fail, respondFromService } from "../http/responses";
+import type { ApiError } from "../http/responses";
 import { requireNumericParam, validateJson } from "../http/validation";
 
 const createMediaSchema = z.object({
@@ -65,20 +65,16 @@ export const createMediaObjectRoutes = (config: AppConfig) => {
         duration_seconds: payload.durationSeconds ?? null,
       });
 
-      return ok(
-        c,
-        {
-          id: created.id,
-          lockId: created.lock_id,
-          url: created.url,
-          thumbnailUrl: created.thumbnail_url,
-          type: created.is_image ? "image" : "video",
-          isMainImage: Boolean(created.is_main_picture),
-          displayOrder: created.display_order,
-          durationSeconds: created.duration_seconds,
-        },
-        "Media object created successfully"
-      );
+      return c.json({
+        id: created.id,
+        lockId: created.lock_id,
+        url: created.url,
+        thumbnailUrl: created.thumbnail_url,
+        type: created.is_image ? "image" : "video",
+        isMainImage: Boolean(created.is_main_picture),
+        displayOrder: created.display_order,
+        durationSeconds: created.duration_seconds,
+      }, 200);
     }
   );
 
@@ -99,16 +95,12 @@ export const createMediaObjectRoutes = (config: AppConfig) => {
         is_main_picture: payload.isMainImage ?? undefined,
       });
 
-      return ok(
-        c,
-        {
-          id: updated.id,
-          url: updated.url,
-          displayOrder: updated.display_order,
-          isMainImage: Boolean(updated.is_main_picture),
-        },
-        "Media object updated successfully"
-      );
+      return c.json({
+        id: updated.id,
+        url: updated.url,
+        displayOrder: updated.display_order,
+        isMainImage: Boolean(updated.is_main_picture),
+      }, 200);
     }
   );
 
@@ -122,7 +114,15 @@ export const createMediaObjectRoutes = (config: AppConfig) => {
     async (c) => {
       const { id } = c.req.valid("param") as { id: number };
       const result = await getContainer(c).services.locks.deleteMedia(id);
-      return respondFromService(c, result);
+      if (result.ok) {
+        return c.json(result.data, result.status ?? 200);
+      }
+      const errorResponse: ApiError = {
+        error: result.error.message,
+        code: result.error.code,
+        details: result.error.details,
+      };
+      return c.json(errorResponse, result.status ?? 400);
     }
   );
 
@@ -135,7 +135,15 @@ export const createMediaObjectRoutes = (config: AppConfig) => {
     async (c) => {
       const updates = c.req.valid("json") as Array<{ id: number; displayOrder: number }>;
       const result = await getContainer(c).services.locks.batchReorder(updates);
-      return respondFromService(c, result);
+      if (result.ok) {
+        return c.json(result.data, result.status ?? 200);
+      }
+      const errorResponse: ApiError = {
+        error: result.error.message,
+        code: result.error.code,
+        details: result.error.details,
+      };
+      return c.json(errorResponse, result.status ?? 400);
     }
   );
 
@@ -150,7 +158,15 @@ export const createMediaObjectRoutes = (config: AppConfig) => {
       const { lockId } = c.req.valid("param") as { lockId: number };
       const { albumTitle } = c.req.valid("json") as { albumTitle: string };
       const result = await getContainer(c).services.locks.updateAlbumTitle(lockId, albumTitle);
-      return respondFromService(c, result);
+      if (result.ok) {
+        return c.json(result.data, result.status ?? 200);
+      }
+      const errorResponse: ApiError = {
+        error: result.error.message,
+        code: result.error.code,
+        details: result.error.details,
+      };
+      return c.json(errorResponse, result.status ?? 400);
     }
   );
 

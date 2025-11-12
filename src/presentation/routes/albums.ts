@@ -3,7 +3,7 @@ import { jwt } from "hono/jwt";
 import type { EnvBindings } from "../../common/bindings";
 import type { AppVariables } from "../../common/context";
 import { getContainer } from "../http/context";
-import { respondFromService } from "../http/responses";
+import type { ApiError } from "../http/responses";
 import { setUserContext } from "../http/middleware";
 import type { AppConfig } from "../../config/env";
 
@@ -24,7 +24,15 @@ export const createAlbumRoutes = (config: AppConfig) => {
       // Fetch album data from database
       const result = await container.services.albums.getAlbumData(hashedId);
 
-      return respondFromService(c, result);
+      if (result.ok) {
+        return c.json(result.data, result.status ?? 200);
+      }
+      const errorResponse: ApiError = {
+        error: result.error.message,
+        code: result.error.code,
+        details: result.error.details,
+      };
+      return c.json(errorResponse, result.status ?? 400);
     }
   );
 

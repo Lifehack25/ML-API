@@ -1,6 +1,6 @@
 import type { Context, MiddlewareHandler } from "hono";
 import type { AppConfig } from "../../config/env";
-import { fail } from "./responses";
+import type { ApiError } from "./responses";
 
 // Rate limiting is now handled by Cloudflare Rate Limiting Rules (configured in Cloudflare Dashboard)
 // Previous in-memory rate limiter removed in favor of edge-native solution
@@ -15,7 +15,7 @@ export const setUserContext = (): MiddlewareHandler => {
   return async (c, next) => {
     const payload = c.get("jwtPayload") as { userId?: number } | undefined;
     if (!payload?.userId) {
-      return fail(c, "User identifier missing from token", 401);
+      return c.json({ error: "User identifier missing from token" } as ApiError, 401);
     }
     c.set("userId", Number(payload.userId));
     await next();
@@ -26,7 +26,7 @@ export const createLockKeyAuth = (config: AppConfig): MiddlewareHandler => {
   return async (c, next) => {
     const header = c.req.header("Create-Lock-Key");
     if (!header || header.trim() !== config.createLockApiKey) {
-      return c.json({ Success: false, Message: "Invalid create-lock API key" }, 401);
+      return c.json({ error: "Invalid create-lock API key" } as ApiError, 401);
     }
     await next();
   };
@@ -36,7 +36,7 @@ export const createPushNotificationKeyAuth = (config: AppConfig): MiddlewareHand
   return async (c, next) => {
     const header = c.req.header("Push-Notification-Key");
     if (!header || header.trim() !== config.pushNotificationKey) {
-      return c.json({ Success: false, Message: "Invalid push notification API key" }, 401);
+      return c.json({ error: "Invalid push notification API key" } as ApiError, 401);
     }
     await next();
   };
@@ -87,7 +87,7 @@ export const idempotencyMiddleware: MiddlewareHandler = async (c, next) => {
   // Require client to provide idempotency key
   const key = c.req.header("Idempotency-Key");
   if (!key) {
-    return fail(c, "Idempotency-Key header is required", 400);
+    return c.json({ error: "Idempotency-Key header is required" } as ApiError, 400);
   }
 
   const endpoint = c.req.path;

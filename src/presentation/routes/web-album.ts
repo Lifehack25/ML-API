@@ -2,7 +2,7 @@ import { Hono } from "hono";
 import type { EnvBindings } from "../../common/bindings";
 import type { AppVariables } from "../../common/context";
 import { getContainer } from "../http/context";
-import { fail } from "../http/responses";
+import type { ApiError } from "../http/responses";
 
 /**
  * Web album routes for serving HTML and static assets
@@ -59,7 +59,7 @@ export const createWebAlbumRoutes = () => {
 
     // Validate lockId
     if (!lockId) {
-      return fail(c, "Album ID is required. Please provide ?id=YOUR_ALBUM_ID", 400);
+      return c.json({ error: "Album ID is required. Please provide ?id=YOUR_ALBUM_ID" } as ApiError, 400);
     }
 
     console.log(`[Web Album] Request for lockId: ${lockId}, isOwner: ${isOwner}, host: ${host}`);
@@ -114,7 +114,7 @@ export const createWebAlbumRoutes = () => {
     );
 
     if (!assetResponse.ok) {
-      return fail(c, "Failed to load album template", 500);
+      return c.json({ error: "Failed to load album template" } as ApiError, 500);
     }
 
     let html = await assetResponse.text();
@@ -167,7 +167,7 @@ export const createWebAlbumRoutes = () => {
       status: 200,
       headers: {
         "Content-Type": "text/html; charset=utf-8",
-        "Cache-Control": "public, max-age=86400, s-maxage=86400", // 24 hours
+        "Cache-Control": "public, max-age=604800, s-maxage=604800", // 7 days
         "X-Cache-Status": "MISS", // Will be HIT on subsequent requests from edge
       },
     });

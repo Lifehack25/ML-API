@@ -144,14 +144,9 @@ export class UserAuthFlowService {
           phoneNumber: request.isEmail ? null : sanitizePhone(identifier),
           authProvider: "Registration",
           providerId: null,
+          emailVerified: request.isEmail ? true : undefined,
+          phoneVerified: request.isEmail ? undefined : true,
         });
-
-        // Mark verified
-        if (request.isEmail) {
-          await this.userRepository.markEmailVerified(created.id);
-        } else {
-          await this.userRepository.markPhoneVerified(created.id);
-        }
 
         // Issue tokens after successful creation
         const tokens = await this.sessionTokenService.issueTokens(created.id, {

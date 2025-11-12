@@ -24,8 +24,8 @@ export class UserRepository {
       phone_number: data.phoneNumber ?? null,
       auth_provider: data.authProvider ?? "",
       provider_id: data.providerId ?? null,
-      email_verified: false,
-      phone_verified: false,
+      email_verified: data.emailVerified ?? false,
+      phone_verified: data.phoneVerified ?? false,
       created_at: now,
       last_login_at: null as string | null,
     };

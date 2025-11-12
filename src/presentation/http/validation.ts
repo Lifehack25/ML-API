@@ -2,7 +2,7 @@ import { validator } from "hono/validator";
 import type { Context } from "hono";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
 import type { z } from "zod";
-import { fail } from "./responses";
+import type { ApiError } from "./responses";
 
 type JsonValidatorOptions = {
   status?: ContentfulStatusCode;
@@ -23,7 +23,7 @@ export async function validateBody<Schema extends z.ZodTypeAny>(
       const message = issue?.message ?? "Invalid request body";
       return {
         success: false,
-        response: fail(c, message, 400, parsed.error.issues),
+        response: c.json({ error: message, details: parsed.error.issues } as ApiError, 400),
       };
     }
 
@@ -34,7 +34,7 @@ export async function validateBody<Schema extends z.ZodTypeAny>(
   } catch {
     return {
       success: false,
-      response: fail(c, "Invalid JSON in request body", 400, null),
+      response: c.json({ error: "Invalid JSON in request body" } as ApiError, 400),
     };
   }
 }
@@ -48,7 +48,7 @@ export const validateJson = <Schema extends z.ZodTypeAny>(
     if (!parsed.success) {
       const issue = parsed.error.issues[0];
       const message = options?.message ?? issue?.message ?? "Invalid request body";
-      return fail(c, message, options?.status ?? 400, parsed.error.issues);
+      return c.json({ error: message, details: parsed.error.issues } as ApiError, options?.status ?? 400);
     }
     return parsed.data;
   });
@@ -64,7 +64,7 @@ export const requireNumericParam = (name: string, options?: NumericParamOptions)
   validator("param", (params, c) => {
     const rawValue = params[name];
     if (rawValue === undefined) {
-      return fail(c, options?.message ?? `Missing ${name}`, options?.status ?? 400, null);
+      return c.json({ error: options?.message ?? `Missing ${name}` } as ApiError, options?.status ?? 400);
     }
 
     const value = Number(rawValue);
@@ -72,23 +72,13 @@ export const requireNumericParam = (name: string, options?: NumericParamOptions)
     const max = options?.max;
 
     if (!Number.isFinite(value)) {
-      return fail(c, options?.message ?? `Invalid ${name}`, options?.status ?? 400, null);
+      return c.json({ error: options?.message ?? `Invalid ${name}` } as ApiError, options?.status ?? 400);
     }
     if (min !== undefined && value < min) {
-      return fail(
-        c,
-        options?.message ?? `Invalid ${name}`,
-        options?.status ?? 400,
-        null
-      );
+      return c.json({ error: options?.message ?? `Invalid ${name}` } as ApiError, options?.status ?? 400);
     }
     if (max !== undefined && value > max) {
-      return fail(
-        c,
-        options?.message ?? `Invalid ${name}`,
-        options?.status ?? 400,
-        null
-      );
+      return c.json({ error: options?.message ?? `Invalid ${name}` } as ApiError, options?.status ?? 400);
     }
 
     return {
@@ -120,5 +110,5 @@ export const booleanQuery = (name: string, options?: BooleanQueryOptions) =>
       };
     }
 
-    return fail(c, options?.message ?? `Invalid ${name}`, options?.status ?? 400, null);
+    return c.json({ error: options?.message ?? `Invalid ${name}` } as ApiError, options?.status ?? 400);
   });

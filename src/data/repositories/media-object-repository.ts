@@ -46,8 +46,8 @@ export class MediaObjectRepository {
       .limit(limit);
   }
 
-  private async unsetMainPicture(lockId: number): Promise<void> {
-    await this.db
+  private unsetMainPictureQuery(lockId: number) {
+    return this.db
       .update(mediaObjects)
       .set({ is_main_picture: false })
       .where(and(eq(mediaObjects.lock_id, lockId), eq(mediaObjects.is_main_picture, true)));
@@ -57,14 +57,9 @@ export class MediaObjectRepository {
    * Create a new media object. If setting as main picture, unsets current main picture atomically.
    */
   async create(request: MediaCreateRequest): Promise<MediaObject> {
-    // If setting as main picture, unset current main picture first
-    if (request.is_main_picture) {
-      await this.unsetMainPicture(request.lock_id);
-    }
-
     const now = new Date().toISOString();
 
-    const result = await this.db
+    const insertQuery = this.db
       .insert(mediaObjects)
       .values({
         lock_id: request.lock_id,
@@ -79,6 +74,19 @@ export class MediaObjectRepository {
         duration_seconds: request.duration_seconds ?? null,
       })
       .returning();
+
+    if (request.is_main_picture) {
+      const [, insertResult] = await this.db.batch(
+        [this.unsetMainPictureQuery(request.lock_id), insertQuery] as [any, ...any[]]
+      );
+      const created = Array.isArray(insertResult) ? insertResult[0] : null;
+      if (!created) {
+        throw new Error("Failed to create media object");
+      }
+      return created;
+    }
+
+    const result = await insertQuery;
 
     if (!result[0]) {
       throw new Error("Failed to create media object");
@@ -95,11 +103,6 @@ export class MediaObjectRepository {
     const current = await this.findById(id);
     if (!current) {
       throw new Error("Media object not found");
-    }
-
-    // If setting as main picture, unset current main picture first
-    if (request.is_main_picture === true) {
-      await this.unsetMainPicture(current.lock_id);
     }
 
     const updates: Partial<MediaObject> = {};
@@ -133,11 +136,24 @@ export class MediaObjectRepository {
       throw new Error("No fields provided for media update");
     }
 
-    const result = await this.db
+    const updateQuery = this.db
       .update(mediaObjects)
       .set(updates)
       .where(eq(mediaObjects.id, id))
       .returning();
+
+    if (request.is_main_picture === true) {
+      const [, updateResult] = await this.db.batch(
+        [this.unsetMainPictureQuery(current.lock_id), updateQuery] as [any, ...any[]]
+      );
+      const updated = Array.isArray(updateResult) ? updateResult[0] : null;
+      if (!updated) {
+        throw new Error("Failed to update media object");
+      }
+      return updated;
+    }
+
+    const result = await updateQuery;
 
     if (!result[0]) {
       throw new Error("Failed to update media object");
@@ -155,26 +171,16 @@ export class MediaObjectRepository {
   }
 
   /**
-   * Batch reorder media objects.
-   * Note: These are executed sequentially. For true atomicity, use within a transaction.
+   * Batch reorder media objects atomically.
    */
   async batchReorder(updates: Array<{ id: number; displayOrder: number }>): Promise<number> {
     if (updates.length === 0) return 0;
 
-    let successCount = 0;
-    for (const update of updates) {
-      try {
-        await this.db
-          .update(mediaObjects)
-          .set({ display_order: update.displayOrder })
-          .where(eq(mediaObjects.id, update.id));
-        successCount++;
-      } catch (error) {
-        // Fail entire batch if any update fails
-        throw new Error(`Failed to reorder media object ${update.id}`);
-      }
-    }
+    const queries = updates.map((update) =>
+      this.db.update(mediaObjects).set({ display_order: update.displayOrder }).where(eq(mediaObjects.id, update.id))
+    );
 
-    return successCount;
+    await this.db.batch(queries as [any, ...any[]]);
+    return updates.length;
   }
 }

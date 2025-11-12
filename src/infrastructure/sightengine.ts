@@ -108,7 +108,10 @@ export const createSightengineClient = (config?: SightengineConfig): Sightengine
             `Original size: ${file.size} bytes`
           );
 
+          const compressionStartTime = performance.now();
           const compressionResult = await compressImage(file, 0.75);
+          const compressionEndTime = performance.now();
+          const compressionDurationMs = compressionEndTime - compressionStartTime;
 
           if (!compressionResult.success) {
             console.error("Failed to compress image:", compressionResult.error);
@@ -123,7 +126,7 @@ export const createSightengineClient = (config?: SightengineConfig): Sightengine
 
           console.log(
             "Retrying Sightengine moderation with compressed image.",
-            `Original: ${file.size} bytes, Compressed: ${compressedFile.size} bytes`
+            `Original: ${file.size} bytes, Compressed: ${compressedFile.size} bytes, CPU time: ${compressionDurationMs.toFixed(2)}ms`
           );
 
           retriedWithCompression = true;

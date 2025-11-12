@@ -11,6 +11,39 @@ import { fail } from "../http/responses";
 export const createWebAlbumRoutes = () => {
   const router = new Hono<{ Bindings: EnvBindings; Variables: AppVariables }>();
 
+  // Lightweight beacon endpoint for tracking scans (bypasses cache)
+  router.get("/scan-beacon", async (c) => {
+    const host = c.req.header("host");
+    if (host !== "album.memorylocks.com") {
+      return c.json({ error: "Invalid host" }, 400);
+    }
+
+    const lockId = c.req.query("id");
+    if (!lockId) {
+      return c.json({ error: "Missing id" }, 400);
+    }
+
+    const container = getContainer(c);
+    const ctx = c.get("executionCtx");
+    const numericLockId = container.services.albums.decodeLockId(lockId);
+
+    if (numericLockId && ctx) {
+      // Increment scan counter asynchronously (don't block response)
+      ctx.waitUntil(
+        container.services.scanCounter.incrementScanAndNotify(numericLockId)
+      );
+    }
+
+    // Return minimal response with no-cache headers
+    return new Response(null, {
+      status: 204,
+      headers: {
+        "Cache-Control": "no-store, no-cache, must-revalidate, private",
+        "Access-Control-Allow-Origin": "https://album.memorylocks.com",
+      },
+    });
+  });
+
   // Serve album HTML with server-side rendered data
   router.get("/", async (c) => {
     // Only handle requests for album.memorylocks.com
@@ -95,11 +128,25 @@ export const createWebAlbumRoutes = () => {
       window.IS_OWNER = ${isOwner};
     </script>`;
 
-    console.log(`[Web Album] Album data script length: ${albumDataScript.length}`);
+    // Inject scan beacon for visitor views only (not for owners)
+    const beaconScript = !isOwner ? `
+    <script>
+      // Fire scan beacon on page load (only for visitors)
+      if (!window.IS_OWNER && document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', function() {
+          navigator.sendBeacon('/scan-beacon?id=${lockId}');
+        });
+      } else if (!window.IS_OWNER) {
+        // Page already loaded, fire immediately
+        navigator.sendBeacon('/scan-beacon?id=${lockId}');
+      }
+    </script>` : '';
 
-    // Insert the script before the closing </head> tag (use regex to handle any whitespace)
+    console.log(`[Web Album] Album data script length: ${albumDataScript.length}, beacon: ${beaconScript.length}`);
+
+    // Insert the scripts before the closing </head> tag (use regex to handle any whitespace)
     const beforeReplace = html.length;
-    html = html.replace(/\s*<\/head>/, `${albumDataScript}\n  </head>`);
+    html = html.replace(/\s*<\/head>/, `${albumDataScript}${beaconScript}\n  </head>`);
     const afterReplace = html.length;
 
     console.log(`[Web Album] HTML injection: before=${beforeReplace}, after=${afterReplace}, injected=${afterReplace > beforeReplace}`);
@@ -112,15 +159,8 @@ export const createWebAlbumRoutes = () => {
 
     console.log(`[Web Album] Returning HTML response, final length: ${html.length}`);
 
-    // Increment scan counter for non-owner views (deferred)
-    if (!isOwner) {
-      const numericLockId = container.services.albums.decodeLockId(lockId);
-      if (numericLockId && ctx) {
-        ctx.waitUntil(
-          container.services.scanCounter.incrementScanAndNotify(numericLockId)
-        );
-      }
-    }
+    // Note: Scan counting is handled by client-side beacon (/scan-beacon)
+    // This allows edge caching while still tracking all visitor views
 
     // Enable Cloudflare edge caching - cached responses will bypass the worker
     return new Response(html, {

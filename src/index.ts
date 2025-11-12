@@ -66,15 +66,13 @@ const buildApp = (config: AppConfig) => {
 
   app.route("/push-notifications", createPushNotificationRoutes(config));
 
-  app.notFound((c) =>
-    c.json(
-      {
-        Success: false,
-        Message: "Endpoint not found",
-      },
-      404
-    )
-  );
+  app.notFound((c) => {
+    const response = {
+      error: "Endpoint not found",
+      code: "NOT_FOUND",
+    };
+    return c.json(response, 404);
+  });
 
   app.onError(handleError);
 

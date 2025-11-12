@@ -18,7 +18,7 @@ export const setUserContext = (): MiddlewareHandler => {
       return c.json({ error: "User identifier missing from token" } as ApiError, 401);
     }
     c.set("userId", Number(payload.userId));
-    await next();
+    return await next();
   };
 };
 
@@ -28,7 +28,7 @@ export const createLockKeyAuth = (config: AppConfig): MiddlewareHandler => {
     if (!header || header.trim() !== config.createLockApiKey) {
       return c.json({ error: "Invalid create-lock API key" } as ApiError, 401);
     }
-    await next();
+    return await next();
   };
 };
 
@@ -38,7 +38,7 @@ export const createPushNotificationKeyAuth = (config: AppConfig): MiddlewareHand
     if (!header || header.trim() !== config.pushNotificationKey) {
       return c.json({ error: "Invalid push notification API key" } as ApiError, 401);
     }
-    await next();
+    return await next();
   };
 };
 
@@ -54,10 +54,9 @@ export const requestLogger = (): MiddlewareHandler => {
 export const allowPublic = (predicate: (c: Context) => boolean, middleware: MiddlewareHandler): MiddlewareHandler => {
   return async (c, next) => {
     if (predicate(c)) {
-      await next();
-      return;
+      return await next();
     }
-    await middleware(c, next);
+    return await middleware(c, next);
   };
 };
 

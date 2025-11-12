@@ -1,8 +1,11 @@
 import { Hono } from "hono";
+import type { Next } from "hono";
 import type { EnvBindings } from "../../common/bindings";
 import type { AppVariables } from "../../common/context";
 import { getContainer } from "../http/context";
 import type { ApiError } from "../http/responses";
+
+const ALBUM_HOST = "album.memorylocks.com";
 
 /**
  * Web album routes for serving HTML and static assets
@@ -45,11 +48,11 @@ export const createWebAlbumRoutes = () => {
   });
 
   // Serve album HTML with server-side rendered data
-  router.get("/", async (c) => {
+  router.get("/", async (c, next: Next) => {
     // Only handle requests for album.memorylocks.com
     const host = c.req.header("host");
-    if (host !== "album.memorylocks.com") {
-      return; // Let other routes handle it
+    if (host !== ALBUM_HOST) {
+      return await next();
     }
 
     const lockId = c.req.query("id");
@@ -174,11 +177,11 @@ export const createWebAlbumRoutes = () => {
   });
 
   // Serve static assets (CSS, JS, images, audio, etc.)
-  router.get("/*", async (c) => {
+  router.get("/*", async (c, next: Next) => {
     // Only handle requests for album.memorylocks.com
     const host = c.req.header("host");
-    if (host !== "album.memorylocks.com") {
-      return; // Let other routes handle it
+    if (host !== ALBUM_HOST) {
+      return await next();
     }
 
     const url = new URL(c.req.url);

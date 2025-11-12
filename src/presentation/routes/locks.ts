@@ -177,7 +177,7 @@ export const createLockRoutes = (config: AppConfig) => {
       if (result.ok) {
         const container = getContainer(c);
         const hashedId = container.hashids.encode(payload.lockId);
-        await invalidateAlbumCache(hashedId);
+        await invalidateAlbumCache(hashedId, container.config.cloudflarePurge);
       }
 
       return respondFromService(c, result);

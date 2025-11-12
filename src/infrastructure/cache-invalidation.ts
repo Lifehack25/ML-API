@@ -1,36 +1,37 @@
 /**
  * Cache invalidation utilities
  *
- * Simple direct cache purging without KV tracking.
+ * Purges album content from Cloudflare's edge cache using the Cache Purge API.
  */
 
-import { cacheDelete } from './cache';
+import { purgeAlbumEdgeCache } from './cloudflare-purge';
+import type { CloudflarePurgeConfig } from '../config/env';
 
 /**
- * Invalidate album cache by hashed ID
+ * Invalidate album edge cache by hashed ID
  *
- * Deletes both JSON (for MAUI app) and HTML (for web album) cache entries.
- * No KV tracking needed since we use a single cache key per album.
+ * Purges the web album HTML from Cloudflare's edge network.
+ * The MAUI app does not use edge caching (caching happens client-side).
  *
  * @param hashedId - Hashed lock identifier
+ * @param purgeConfig - Cloudflare purge configuration (zone ID and token)
  */
-export async function invalidateAlbumCache(hashedId: string): Promise<void> {
+export async function invalidateAlbumCache(
+  hashedId: string,
+  purgeConfig?: CloudflarePurgeConfig
+): Promise<void> {
   try {
-    const cacheKey = `album:${hashedId}`;
-
-    // Delete JSON cache (for MAUI app API)
-    const deletedJson = await cacheDelete(cacheKey);
-
-    // Delete HTML cache (for web album)
-    const deletedHtml = await cacheDelete(`${cacheKey}-html`);
-
-    if (deletedJson || deletedHtml) {
-      console.log(`Successfully invalidated cache for album ${hashedId} (JSON: ${deletedJson}, HTML: ${deletedHtml})`);
-    } else {
-      console.log(`No cache entries found for album ${hashedId}`);
+    if (!purgeConfig) {
+      console.log(`[Cache Invalidation] Cloudflare purge not configured, skipping invalidation for album ${hashedId}`);
+      return;
     }
+
+    // Purge edge cache for web album HTML
+    await purgeAlbumEdgeCache(hashedId, purgeConfig);
+
+    console.log(`[Cache Invalidation] Successfully purged edge cache for album ${hashedId}`);
   } catch (error) {
-    console.error(`Error invalidating cache for album ${hashedId}:`, error);
+    console.error(`[Cache Invalidation] Error purging cache for album ${hashedId}:`, error);
     // Don't throw - invalidation failures shouldn't break the application
   }
 }

@@ -3,10 +3,6 @@ import type { EnvBindings } from "../../common/bindings";
 import type { AppVariables } from "../../common/context";
 import { getContainer } from "../http/context";
 import { fail } from "../http/responses";
-import {
-  getCacheKeyAlbum,
-  addCacheHeader,
-} from "../../infrastructure/cache";
 
 /**
  * Web album routes for serving HTML and static assets
@@ -75,7 +71,7 @@ export const createWebAlbumRoutes = () => {
   </div>
 </body>
 </html>`,
-        result.status
+        result.status as 404 | 500
       );
     }
 
@@ -126,16 +122,13 @@ export const createWebAlbumRoutes = () => {
       }
     }
 
-    // Return HTML without caching for now (debugging)
+    // Enable Cloudflare edge caching - cached responses will bypass the worker
     return new Response(html, {
       status: 200,
       headers: {
         "Content-Type": "text/html; charset=utf-8",
-        "Cache-Control": "no-cache, no-store, must-revalidate, private",
-        "Pragma": "no-cache",
-        "Expires": "0",
-        "X-Cache": "DISABLED",
-        "X-Debug": "Worker-Executed",
+        "Cache-Control": "public, max-age=43200, s-maxage=43200", // 12 hours
+        "X-Cache-Status": "MISS", // Will be HIT on subsequent requests from edge
       },
     });
   });

@@ -74,7 +74,10 @@ const evaluateResponse = (payload: SightengineResponse): ModerationResult => {
   };
 };
 
-export const createSightengineClient = (config?: SightengineConfig): SightengineClient => {
+export const createSightengineClient = (
+  config?: SightengineConfig,
+  imagesBinding?: ImagesBinding
+): SightengineClient => {
   // If Sightengine is not configured, allow all content through
   if (!config) {
     return {
@@ -108,8 +111,17 @@ export const createSightengineClient = (config?: SightengineConfig): Sightengine
             `Original size: ${file.size} bytes`
           );
 
+          // Fail fast if Images binding is not available
+          if (!imagesBinding) {
+            console.error("Cannot compress image: Images binding not available");
+            return {
+              approved: false,
+              rejectionReason: "Image compression unavailable (server configuration error)",
+            };
+          }
+
           const compressionStartTime = performance.now();
-          const compressionResult = await compressImage(file, 0.75);
+          const compressionResult = await compressImage(file, imagesBinding, 75);
           const compressionEndTime = performance.now();
           const compressionDurationMs = compressionEndTime - compressionStartTime;
 

@@ -1,31 +1,32 @@
-// Compresses an image file using Canvas API (Web-standard, works in Cloudflare Workers).
+// Compresses an image file using Cloudflare Images binding (native Workers API).
 export async function compressImage(
   file: File,
-  quality: number = 0.75
+  imagesBinding: ImagesBinding,
+  quality: number = 75
 ): Promise<{ success: true; compressed: File } | { success: false; error: string }> {
   try {
-    // Convert File to ImageBitmap (native browser API)
-    const bitmap = await createImageBitmap(file);
+    // Convert File to ReadableStream for Cloudflare Images API
+    const stream = file.stream();
 
-    // Create an OffscreenCanvas with the image dimensions
-    const canvas = new OffscreenCanvas(bitmap.width, bitmap.height);
-    const ctx = canvas.getContext("2d");
+    // Use Cloudflare Images binding to compress the image
+    // Quality is 0-100 (not 0-1 like Canvas API)
+    const transformationResult = await imagesBinding
+      .input(stream)
+      .output({ format: "image/jpeg", quality });
 
-    if (!ctx) {
-      return { success: false, error: "Failed to get canvas context" };
+    // Get the response from the transformation result
+    const response = transformationResult.response();
+
+    if (!response.ok) {
+      return {
+        success: false,
+        error: `Cloudflare Images compression failed: ${response.status} ${response.statusText}`,
+      };
     }
 
-    // Draw the image to the canvas
-    ctx.drawImage(bitmap, 0, 0);
-
-    // Convert to compressed JPEG blob
-    const blob = await canvas.convertToBlob({
-      type: "image/jpeg",
-      quality,
-    });
-
-    // Convert Blob back to File
-    const compressedFile = new File([blob], file.name, {
+    // Convert response to Blob, then to File
+    const compressedBlob = await response.blob();
+    const compressedFile = new File([compressedBlob], file.name, {
       type: "image/jpeg",
       lastModified: Date.now(),
     });

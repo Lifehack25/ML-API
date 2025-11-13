@@ -2,6 +2,7 @@ export interface EnvBindings {
   DB: D1Database;
   IDEMPOTENCY_KEYS: KVNamespace;
   ASSETS: Fetcher;
+  IMAGES: ImagesBinding;
   CREATE_LOCK_API_KEY: string;
   PUSH_NOTIFICATION_KEY: string;
   HASHIDS_SALT: string;

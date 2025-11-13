@@ -64,7 +64,7 @@ export const createRequestContext = (
   const logger = createLogger(requestId);
 
   const twilioClient = config.twilio ? createTwilioVerifyClient(config.twilio) : null;
-  const sightengineClient = createSightengineClient(config.sightengine);
+  const sightengineClient = createSightengineClient(config.sightengine, env.IMAGES);
   const cloudflareClient = createCloudflareMediaClient(config.cloudflareMedia);
   const firebaseClient = createFirebaseMessagingClient(config.firebase);
   const appleVerifier = createAppleVerifier(config.apple);

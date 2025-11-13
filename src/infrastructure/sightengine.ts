@@ -121,7 +121,7 @@ export const createSightengineClient = (
           }
 
           const compressionStartTime = performance.now();
-          const compressionResult = await compressImage(file, imagesBinding, 75);
+          const compressionResult = await compressImage(file, imagesBinding, 90);
           const compressionEndTime = performance.now();
           const compressionDurationMs = compressionEndTime - compressionStartTime;
 

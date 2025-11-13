@@ -164,9 +164,34 @@ export class ManageMediaService {
     }
 
     // Always upload original file for best quality - Cloudflare will optimize at delivery
-    const uploadResult = isVideo
+    let uploadResult = isVideo
       ? await this.cloudflareClient.uploadVideo(file)
       : await this.cloudflareClient.uploadImage(file);
+
+    // If upload failed due to size, retry with compressed image (if available)
+    if (
+      !uploadResult.success &&
+      !isVideo &&
+      moderation.compressedImage &&
+      (uploadResult.error?.includes("5413") ||
+        uploadResult.error?.includes("413") ||
+        uploadResult.error?.includes("too large") ||
+        uploadResult.error?.includes("Payload Too Large"))
+    ) {
+      this.logger.warn("Cloudflare rejected original image (too large). Retrying with compressed version.", {
+        originalSize: file.size,
+        compressedSize: moderation.compressedImage.size,
+        error: uploadResult.error,
+      });
+
+      uploadResult = await this.cloudflareClient.uploadImage(moderation.compressedImage);
+
+      if (uploadResult.success) {
+        this.logger.info("Successfully uploaded compressed image to Cloudflare", {
+          cloudflareId: uploadResult.cloudflareId,
+        });
+      }
+    }
 
     if (!uploadResult.success || !uploadResult.url || !uploadResult.cloudflareId) {
       return failure("UPLOAD_FAILED", uploadResult.error ?? "Failed to upload media", undefined, 502);

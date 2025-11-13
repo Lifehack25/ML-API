@@ -1,8 +1,10 @@
+import type { StatusCode } from "hono/utils/http-status";
+
 export interface ServiceSuccess<T> {
   ok: true;
   data: T;
   message?: string;
-  status?: number;
+  status?: StatusCode;
 }
 
 export interface ServiceErrorDetail {
@@ -14,7 +16,7 @@ export interface ServiceErrorDetail {
 export interface ServiceFailure {
   ok: false;
   error: ServiceErrorDetail;
-  status?: number;
+  status?: StatusCode;
 }
 
 export type ServiceResult<T> = ServiceSuccess<T> | ServiceFailure;
@@ -22,7 +24,7 @@ export type ServiceResult<T> = ServiceSuccess<T> | ServiceFailure;
 export const success = <T>(
   data: T,
   message?: string,
-  status?: number
+  status?: StatusCode
 ): ServiceSuccess<T> => ({
   ok: true,
   data,
@@ -34,7 +36,7 @@ export const failure = (
   code: string,
   message: string,
   details?: unknown,
-  status?: number
+  status?: StatusCode
 ): ServiceFailure => ({
   ok: false,
   error: { code, message, details },

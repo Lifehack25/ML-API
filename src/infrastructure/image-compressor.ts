@@ -10,6 +10,14 @@ export async function compressImage(
     const infoStream = file.stream();
     const imageInfo = await imagesBinding.info(infoStream);
 
+    // Check if image has width/height (SVG images don't)
+    if (!('width' in imageInfo) || !('height' in imageInfo)) {
+      return {
+        success: false,
+        error: 'Image format does not support compression (SVG or unsupported format)',
+      };
+    }
+
     // Calculate new dimensions (87% of original for ~25% size reduction)
     const scaleFactor = 0.87;
     const newWidth = Math.round(imageInfo.width * scaleFactor);

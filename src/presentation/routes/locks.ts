@@ -239,7 +239,18 @@ export const createLockRoutes = (config: AppConfig) => {
     jwtMiddleware,
     attachUser,
     async (c) => {
-      const form = await c.req.formData();
+      let form: FormData;
+      try {
+        form = await c.req.formData();
+      } catch (error) {
+        console.error("Failed to parse multipart form data", error);
+        return c.json(
+          {
+            error: "Invalid multipart form data. Ensure every part has a name attribute.",
+          } as ApiError,
+          400
+        );
+      }
       const file = form.get("file");
       const lockId = Number(form.get("lockId"));
       if (!Number.isFinite(lockId)) {

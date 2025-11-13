@@ -147,7 +147,6 @@ export const createFirebaseMessagingClient = (config?: FirebaseConfig): Firebase
               payload: {
                 aps: {
                   sound: "default",
-                  badge: 1,
                 },
               },
             },

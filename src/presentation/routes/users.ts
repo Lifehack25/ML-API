@@ -1,4 +1,5 @@
 import { Hono } from "hono";
+import type { StatusCode } from "hono/utils/http-status";
 import type { Context } from "hono";
 import { jwt } from "hono/jwt";
 import { z } from "zod";
@@ -96,14 +97,14 @@ export const createUserRoutes = (config: AppConfig) => {
       const payload = c.req.valid("json") as SendCodeRequest;
       const result = await getService(c).services.auth.sendVerificationCode(payload);
       if (result.ok) {
-        return c.json(result.data, result.status ?? 200);
+        return c.json(result.data, (result.status || 200) as StatusCode);
       }
       const errorResponse: ApiError = {
         error: result.error.message,
         code: result.error.code,
         details: result.error.details,
       };
-      return c.json(errorResponse, result.status ?? 400);
+      return c.json(errorResponse, (result.status || 400) as StatusCode);
     }
   );
 
@@ -115,14 +116,14 @@ export const createUserRoutes = (config: AppConfig) => {
       const payload = c.req.valid("json") as { isEmail: boolean; identifier: string };
       const result = await getService(c).services.users.resendTwilioCode(payload.isEmail, payload.identifier);
       if (result.ok) {
-        return c.json(result.data, result.status ?? 200);
+        return c.json(result.data, (result.status || 200) as StatusCode);
       }
       const errorResponse: ApiError = {
         error: result.error.message,
         code: result.error.code,
         details: result.error.details,
       };
-      return c.json(errorResponse, result.status ?? 400);
+      return c.json(errorResponse, (result.status || 400) as StatusCode);
     }
   );
 
@@ -135,14 +136,14 @@ export const createUserRoutes = (config: AppConfig) => {
       const payload = c.req.valid("json") as VerifyCodeRequest;
       const result = await getService(c).services.auth.verifyCode(payload);
       if (result.ok) {
-        return c.json(result.data, result.status ?? 200);
+        return c.json(result.data, (result.status || 200) as StatusCode);
       }
       const errorResponse: ApiError = {
         error: result.error.message,
         code: result.error.code,
         details: result.error.details,
       };
-      return c.json(errorResponse, result.status ?? 400);
+      return c.json(errorResponse, (result.status || 400) as StatusCode);
     }
   );
 
@@ -154,14 +155,14 @@ export const createUserRoutes = (config: AppConfig) => {
       const payload = c.req.valid("json") as RefreshTokenRequest;
       const result = await getService(c).services.auth.refreshTokens(payload);
       if (result.ok) {
-        return c.json(result.data, result.status ?? 200);
+        return c.json(result.data, (result.status || 200) as StatusCode);
       }
       const errorResponse: ApiError = {
         error: result.error.message,
         code: result.error.code,
         details: result.error.details,
       };
-      return c.json(errorResponse, result.status ?? 400);
+      return c.json(errorResponse, (result.status || 400) as StatusCode);
     }
   );
 
@@ -174,14 +175,14 @@ export const createUserRoutes = (config: AppConfig) => {
       const payload = c.req.valid("json") as AppleAuthRequest;
       const result = await getService(c).services.auth.verifyApple(payload);
       if (result.ok) {
-        return c.json(result.data, result.status ?? 200);
+        return c.json(result.data, (result.status || 200) as StatusCode);
       }
       const errorResponse: ApiError = {
         error: result.error.message,
         code: result.error.code,
         details: result.error.details,
       };
-      return c.json(errorResponse, result.status ?? 400);
+      return c.json(errorResponse, (result.status || 400) as StatusCode);
     }
   );
 
@@ -194,14 +195,14 @@ export const createUserRoutes = (config: AppConfig) => {
       const payload = c.req.valid("json") as { idToken: string };
       const result = await getService(c).services.auth.verifyGoogle(payload);
       if (result.ok) {
-        return c.json(result.data, result.status ?? 200);
+        return c.json(result.data, (result.status || 200) as StatusCode);
       }
       const errorResponse: ApiError = {
         error: result.error.message,
         code: result.error.code,
         details: result.error.details,
       };
-      return c.json(errorResponse, result.status ?? 400);
+      return c.json(errorResponse, (result.status || 400) as StatusCode);
     }
   );
 
@@ -212,14 +213,14 @@ export const createUserRoutes = (config: AppConfig) => {
     const userId = getUserId(c);
     const result = await getService(c).services.users.getProfile(userId);
       if (result.ok) {
-        return c.json(result.data, result.status ?? 200);
+        return c.json(result.data, (result.status || 200) as StatusCode);
       }
       const errorResponse: ApiError = {
         error: result.error.message,
         code: result.error.code,
         details: result.error.details,
       };
-      return c.json(errorResponse, result.status ?? 400);
+      return c.json(errorResponse, (result.status || 400) as StatusCode);
   });
 
   // Update the authenticated user's display name.
@@ -231,14 +232,14 @@ export const createUserRoutes = (config: AppConfig) => {
       const payload = c.req.valid("json") as UpdateUserNameRequest;
       const result = await getService(c).services.users.updateName(userId, payload);
       if (result.ok) {
-        return c.json(result.data, result.status ?? 200);
+        return c.json(result.data, (result.status || 200) as StatusCode);
       }
       const errorResponse: ApiError = {
         error: result.error.message,
         code: result.error.code,
         details: result.error.details,
       };
-      return c.json(errorResponse, result.status ?? 400);
+      return c.json(errorResponse, (result.status || 400) as StatusCode);
     }
   );
 
@@ -252,14 +253,14 @@ export const createUserRoutes = (config: AppConfig) => {
       const payload = c.req.valid("json") as Omit<VerifyIdentifierRequest, "userId">;
       const result = await getService(c).services.users.verifyIdentifier({ ...payload, userId });
       if (result.ok) {
-        return c.json(result.data, result.status ?? 200);
+        return c.json(result.data, (result.status || 200) as StatusCode);
       }
       const errorResponse: ApiError = {
         error: result.error.message,
         code: result.error.code,
         details: result.error.details,
       };
-      return c.json(errorResponse, result.status ?? 400);
+      return c.json(errorResponse, (result.status || 400) as StatusCode);
     }
   );
 
@@ -272,14 +273,14 @@ export const createUserRoutes = (config: AppConfig) => {
       const payload = c.req.valid("json") as UpdateDeviceTokenRequest;
       const result = await getService(c).services.users.updateDeviceToken(userId, payload);
       if (result.ok) {
-        return c.json(result.data, result.status ?? 200);
+        return c.json(result.data, (result.status || 200) as StatusCode);
       }
       const errorResponse: ApiError = {
         error: result.error.message,
         code: result.error.code,
         details: result.error.details,
       };
-      return c.json(errorResponse, result.status ?? 400);
+      return c.json(errorResponse, (result.status || 400) as StatusCode);
     }
   );
 
@@ -293,14 +294,14 @@ export const createUserRoutes = (config: AppConfig) => {
       const { deleteMedia } = c.req.valid("query") as { deleteMedia: boolean };
       const result = await getService(c).services.users.deleteAccount(userId, deleteMedia);
       if (result.ok) {
-        return c.json(result.data, result.status ?? 200);
+        return c.json(result.data, (result.status || 200) as StatusCode);
       }
       const errorResponse: ApiError = {
         error: result.error.message,
         code: result.error.code,
         details: result.error.details,
       };
-      return c.json(errorResponse, result.status ?? 400);
+      return c.json(errorResponse, (result.status || 400) as StatusCode);
     }
   );
 

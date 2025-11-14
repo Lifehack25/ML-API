@@ -4,17 +4,17 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-Memory Locks API (ML-API) is a Cloudflare Workers-based edge-native API for managing digital memory locks - physical products with QR codes that unlock photo/video albums. Built with Hono framework, TypeScript, and Cloudflare D1 (SQLite).
+Memory Locks API (ML-API) is a Cloudflare Workers-based edge-native API for managing Memory Locks - physical products with QR codes that unlock photo/video albums. Built with Hono framework, TypeScript, Cloudflare D1 (SQLite), KV (Key value pair database) and Images/Stream (media database).
 
 ## Key Commands
 
 ### Development
 ```bash
-npm run dev              # Local development with Wrangler
-npm run build           # Dry-run deploy to validate build
-npm run lint            # TypeScript type checking (no emit)
-npm test                # Run Vitest tests
-npm run test:watch      # Watch mode for tests
+  npm run dev             # Local development with Wrangler
+  npm run build           # Dry-run deploy to validate build
+  npm run lint            # TypeScript type checking (no emit)
+  npm test                # Run Vitest tests
+  npm run test:watch      # Watch mode for tests
 ```
 
 ### Deployment
@@ -22,14 +22,14 @@ Deployment is automated via GitHub Actions. Push to `main` branch to trigger aut
 
 ### Database Migrations
 ```bash
-wrangler d1 execute DB --remote --file=./db/migrations/XXX_migration_name.sql
+  wrangler d1 execute DB --remote --file=./db/migrations/XXX_migration_name.sql
 ```
 
 ### Secrets Management
 Secrets are managed via Wrangler CLI, not in code:
 ```bash
-wrangler secret put SECRET_NAME
-wrangler secret list
+  wrangler secret put SECRET_NAME
+  wrangler secret list
 ```
 
 ## Architecture

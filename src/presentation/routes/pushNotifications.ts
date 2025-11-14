@@ -1,5 +1,4 @@
 import { Hono } from "hono";
-import type { StatusCode } from "hono/utils/http-status";
 import { z } from "zod";
 import type { EnvBindings } from "../../common/bindings";
 import type { AppVariables } from "../../common/context";
@@ -26,14 +25,14 @@ export const createPushNotificationRoutes = (config: AppConfig) => {
 
     const result = await getContainer(c).services.notifications.sendNotification(validation.data);
       if (result.ok) {
-        return c.json(result.data, (result.status || 200) as StatusCode);
+        return c.json(result.data, result.status ?? 200);
       }
       const errorResponse: ApiError = {
         error: result.error.message,
         code: result.error.code,
         details: result.error.details,
       };
-      return c.json(errorResponse, (result.status || 400) as StatusCode);
+      return c.json(errorResponse, result.status ?? 400);
   });
 
   return router;

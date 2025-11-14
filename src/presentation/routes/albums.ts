@@ -1,6 +1,5 @@
 import { Hono } from "hono";
 import { jwt } from "hono/jwt";
-import type { StatusCode } from "hono/utils/http-status";
 import type { EnvBindings } from "../../common/bindings";
 import type { AppVariables } from "../../common/context";
 import { getContainer } from "../http/context";
@@ -26,14 +25,14 @@ export const createAlbumRoutes = (config: AppConfig) => {
       const result = await container.services.albums.getAlbumData(hashedId);
 
       if (result.ok) {
-        return c.json(result.data, (result.status || 200) as StatusCode);
+        return c.json(result.data, result.status ?? 200);
       }
       const errorResponse: ApiError = {
         error: result.error.message,
         code: result.error.code,
         details: result.error.details,
       };
-      return c.json(errorResponse, (result.status || 400) as StatusCode);
+      return c.json(errorResponse, result.status ?? 400);
     }
   );
 

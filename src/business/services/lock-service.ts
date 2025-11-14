@@ -113,7 +113,7 @@ export class LockService {
     return this.mediaService.batchReorder(updates);
   }
 
-  async updateAlbumTitle(lockId: number, albumTitle: string) {
+  async updateAlbumTitle(lockId: number, albumTitle: string): Promise<ServiceResult<LockSummary>> {
     const updated = await this.lockRepository.update(lockId, { album_title: albumTitle });
     return success(mapLockRowToSummary(updated, this.hashids), "Album title updated");
   }

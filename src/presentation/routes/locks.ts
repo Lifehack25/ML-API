@@ -1,5 +1,4 @@
 import { Hono } from "hono";
-import type { StatusCode } from "hono/utils/http-status";
 import type { Context } from "hono";
 import { jwt } from "hono/jwt";
 import type { EnvBindings } from "../../common/bindings";
@@ -81,14 +80,14 @@ export const createLockRoutes = (config: AppConfig) => {
 
       const result = await getContainer(c).services.locks.getUserLocks(requestedUserId);
       if (result.ok) {
-        return c.json(result.data, (result.status || 200) as StatusCode);
+        return c.json(result.data, result.status ?? 200);
       }
       const errorResponse: ApiError = {
         error: result.error.message,
         code: result.error.code,
         details: result.error.details,
       };
-      return c.json(errorResponse, (result.status || 400) as StatusCode);
+      return c.json(errorResponse, result.status ?? 400);
     }
   );
 
@@ -106,14 +105,14 @@ export const createLockRoutes = (config: AppConfig) => {
       }
       const result = await getContainer(c).services.locks.updateLockName(payload);
       if (result.ok) {
-        return c.json(result.data, (result.status || 200) as StatusCode);
+        return c.json(result.data, result.status ?? 200);
       }
       const errorResponse: ApiError = {
         error: result.error.message,
         code: result.error.code,
         details: result.error.details,
       };
-      return c.json(errorResponse, (result.status || 400) as StatusCode);
+      return c.json(errorResponse, result.status ?? 400);
     }
   );
 
@@ -131,14 +130,14 @@ export const createLockRoutes = (config: AppConfig) => {
       }
       const result = await getContainer(c).services.locks.toggleSealDate(lockId);
       if (result.ok) {
-        return c.json(result.data, (result.status || 200) as StatusCode);
+        return c.json(result.data, result.status ?? 200);
       }
       const errorResponse: ApiError = {
         error: result.error.message,
         code: result.error.code,
         details: result.error.details,
       };
-      return c.json(errorResponse, (result.status || 400) as StatusCode);
+      return c.json(errorResponse, result.status ?? 400);
     }
   );
 
@@ -156,14 +155,14 @@ export const createLockRoutes = (config: AppConfig) => {
       }
       const result = await getContainer(c).services.locks.upgradeStorage(lockId);
       if (result.ok) {
-        return c.json(result.data, (result.status || 200) as StatusCode);
+        return c.json(result.data, result.status ?? 200);
       }
       const errorResponse: ApiError = {
         error: result.error.message,
         code: result.error.code,
         details: result.error.details,
       };
-      return c.json(errorResponse, (result.status || 400) as StatusCode);
+      return c.json(errorResponse, result.status ?? 400);
     }
   );
 
@@ -185,14 +184,14 @@ export const createLockRoutes = (config: AppConfig) => {
         hashedLockId.trim()
       );
       if (result.ok) {
-        return c.json(result.data, (result.status || 200) as StatusCode);
+        return c.json(result.data, result.status ?? 200);
       }
       const errorResponse: ApiError = {
         error: result.error.message,
         code: result.error.code,
         details: result.error.details,
       };
-      return c.json(errorResponse, (result.status || 400) as StatusCode);
+      return c.json(errorResponse, result.status ?? 400);
     }
   );
 
@@ -222,14 +221,14 @@ export const createLockRoutes = (config: AppConfig) => {
       }
 
       if (result.ok) {
-        return c.json(result.data, (result.status || 200) as StatusCode);
+        return c.json(result.data, result.status ?? 200);
       }
       const errorResponse: ApiError = {
         error: result.error.message,
         code: result.error.code,
         details: result.error.details,
       };
-      return c.json(errorResponse, (result.status || 400) as StatusCode);
+      return c.json(errorResponse, result.status ?? 400);
     }
   );
 
@@ -286,14 +285,14 @@ export const createLockRoutes = (config: AppConfig) => {
       });
 
       if (result.ok) {
-        return c.json(result.data, (result.status || 200) as StatusCode);
+        return c.json(result.data, result.status ?? 200);
       }
       const errorResponse: ApiError = {
         error: result.error.message,
         code: result.error.code,
         details: result.error.details,
       };
-      return c.json(errorResponse, (result.status || 400) as StatusCode);
+      return c.json(errorResponse, result.status ?? 400);
     }
   );
 
@@ -334,14 +333,14 @@ export const createLockRoutes = (config: AppConfig) => {
       }
       const result = await getContainer(c).services.locks.getValidationData(lockId);
       if (result.ok) {
-        return c.json(result.data, (result.status || 200) as StatusCode);
+        return c.json(result.data, result.status ?? 200);
       }
       const errorResponse: ApiError = {
         error: result.error.message,
         code: result.error.code,
         details: result.error.details,
       };
-      return c.json(errorResponse, (result.status || 400) as StatusCode);
+      return c.json(errorResponse, result.status ?? 400);
     }
   );
 

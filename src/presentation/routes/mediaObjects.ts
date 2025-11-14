@@ -1,5 +1,4 @@
 import { Hono } from "hono";
-import type { StatusCode } from "hono/utils/http-status";
 import { jwt } from "hono/jwt";
 import { z } from "zod";
 import type { EnvBindings } from "../../common/bindings";
@@ -116,14 +115,14 @@ export const createMediaObjectRoutes = (config: AppConfig) => {
       const { id } = c.req.valid("param") as { id: number };
       const result = await getContainer(c).services.locks.deleteMedia(id);
       if (result.ok) {
-        return c.json(result.data, (result.status || 200) as StatusCode);
+        return c.json(result.data, result.status ?? 200);
       }
       const errorResponse: ApiError = {
         error: result.error.message,
         code: result.error.code,
         details: result.error.details,
       };
-      return c.json(errorResponse, (result.status || 400) as StatusCode);
+      return c.json(errorResponse, result.status ?? 400);
     }
   );
 
@@ -137,14 +136,14 @@ export const createMediaObjectRoutes = (config: AppConfig) => {
       const updates = c.req.valid("json") as Array<{ id: number; displayOrder: number }>;
       const result = await getContainer(c).services.locks.batchReorder(updates);
       if (result.ok) {
-        return c.json(result.data, (result.status || 200) as StatusCode);
+        return c.json(result.data, result.status ?? 200);
       }
       const errorResponse: ApiError = {
         error: result.error.message,
         code: result.error.code,
         details: result.error.details,
       };
-      return c.json(errorResponse, (result.status || 400) as StatusCode);
+      return c.json(errorResponse, result.status ?? 400);
     }
   );
 
@@ -160,14 +159,14 @@ export const createMediaObjectRoutes = (config: AppConfig) => {
       const { albumTitle } = c.req.valid("json") as { albumTitle: string };
       const result = await getContainer(c).services.locks.updateAlbumTitle(lockId, albumTitle);
       if (result.ok) {
-        return c.json(result.data, (result.status || 200) as StatusCode);
+        return c.json(result.data, result.status ?? 200);
       }
       const errorResponse: ApiError = {
         error: result.error.message,
         code: result.error.code,
         details: result.error.details,
       };
-      return c.json(errorResponse, (result.status || 400) as StatusCode);
+      return c.json(errorResponse, result.status ?? 400);
     }
   );
 

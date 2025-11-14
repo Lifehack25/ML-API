@@ -15,7 +15,7 @@ export const createWebAlbumRoutes = () => {
   const router = new Hono<{ Bindings: EnvBindings; Variables: AppVariables }>();
 
   // Lightweight beacon endpoint for tracking scans (bypasses cache)
-  router.get("/scan-beacon", async (c) => {
+  router.post("/scan-beacon", async (c) => {
     const host = c.req.header("host");
     if (host !== "album.memorylocks.com") {
       return c.json({ error: "Invalid host" }, 400);

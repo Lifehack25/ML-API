@@ -97,16 +97,21 @@ export const createWebAlbumRoutes = () => {
     const pageTitle = result.ok ? result.data.AlbumTitle : 'Memory Locks Album';
 
     // Generate Open Graph and Twitter Card meta tags
+    const faviconUrl = 'https://album.memorylocks.com/Resources/favicon.webp?v=2';
+    const ogImageUrl = mainImageUrl || faviconUrl; // Fallback to favicon if no main image
+
     const metaTags = `
     <meta property="og:title" content="${pageTitle}">
     <meta property="og:type" content="website">
     <meta property="og:url" content="https://album.memorylocks.com/?id=${lockId}">
     <meta property="og:description" content="View your Memory Locks photo album">
-    ${mainImageUrl ? `<meta property="og:image" content="${mainImageUrl}">` : ''}
+    <meta property="og:image" content="${ogImageUrl}">
+    <meta property="og:image:width" content="512">
+    <meta property="og:image:height" content="512">
     <meta name="twitter:card" content="summary_large_image">
     <meta name="twitter:title" content="${pageTitle}">
     <meta name="twitter:description" content="View your Memory Locks photo album">
-    ${mainImageUrl ? `<meta name="twitter:image" content="${mainImageUrl}">` : ''}`;
+    <meta name="twitter:image" content="${ogImageUrl}">`;
 
     // Inject album data into the HTML (only if data was successfully fetched)
     const albumDataScript = result.ok ? `

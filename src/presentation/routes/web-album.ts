@@ -74,44 +74,9 @@ export const createWebAlbumRoutes = () => {
 
     if (!result.ok) {
       console.log(`[Web Album] Error fetching album: ${result.error.message}`);
-      return c.html(
-        `<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Album Not Found</title>
-  <style>
-    body {
-      font-family: system-ui, -apple-system, sans-serif;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      height: 100vh;
-      margin: 0;
-      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-      color: white;
-    }
-    .error-container {
-      text-align: center;
-      padding: 2rem;
-    }
-    h1 { font-size: 3rem; margin: 0; }
-    p { font-size: 1.2rem; opacity: 0.9; }
-  </style>
-</head>
-<body>
-  <div class="error-container">
-    <h1>Album Not Found</h1>
-    <p>${result.error.message}</p>
-  </div>
-</body>
-</html>`,
-        result.status as 404 | 500
-      );
     }
 
-    // Fetch the HTML template from the assets binding
+    // Always fetch the HTML template from the assets binding (even if no data)
     const assetResponse = await c.env.ASSETS.fetch(
       new Request("http://assets/index.html")
     );
@@ -124,32 +89,60 @@ export const createWebAlbumRoutes = () => {
 
     console.log(`[Web Album] Fetched HTML template, length: ${html.length}`);
 
-    // Inject album data into the HTML
-    const albumDataScript = `
+    // Extract main image URL for Open Graph tags (if data loaded successfully)
+    const mainImage = result.ok ? result.data.Media.find(m => m.IsMainImage) : null;
+    const mainImageUrl = mainImage?.Url || null;
+
+    // Generate dynamic page title
+    const pageTitle = result.ok ? result.data.AlbumTitle : 'Memory Locks Album';
+
+    // Generate Open Graph and Twitter Card meta tags
+    const metaTags = `
+    <meta property="og:title" content="${pageTitle}">
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://album.memorylocks.com/?id=${lockId}">
+    <meta property="og:description" content="View your Memory Locks photo album">
+    ${mainImageUrl ? `<meta property="og:image" content="${mainImageUrl}">` : ''}
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="${pageTitle}">
+    <meta name="twitter:description" content="View your Memory Locks photo album">
+    ${mainImageUrl ? `<meta name="twitter:image" content="${mainImageUrl}">` : ''}`;
+
+    // Inject album data into the HTML (only if data was successfully fetched)
+    const albumDataScript = result.ok ? `
     <script>
       window.ALBUM_DATA = ${JSON.stringify(result.data)};
+      window.IS_OWNER = ${isOwner};
+    </script>` : `
+    <script>
       window.IS_OWNER = ${isOwner};
     </script>`;
 
     // Inject scan beacon for visitor views only (not for owners)
+    // Only fires if ALBUM_DATA exists (prevents beacon on failed data loads)
     const beaconScript = !isOwner ? `
     <script>
-      // Fire scan beacon on page load (only for visitors)
-      if (!window.IS_OWNER && document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', function() {
+      // Fire scan beacon on page load (only for visitors with valid data)
+      if (!window.IS_OWNER && window.ALBUM_DATA) {
+        if (document.readyState === 'loading') {
+          document.addEventListener('DOMContentLoaded', function() {
+            navigator.sendBeacon('/scan-beacon?id=${lockId}');
+          });
+        } else {
+          // Page already loaded, fire immediately
           navigator.sendBeacon('/scan-beacon?id=${lockId}');
-        });
-      } else if (!window.IS_OWNER) {
-        // Page already loaded, fire immediately
-        navigator.sendBeacon('/scan-beacon?id=${lockId}');
+        }
       }
     </script>` : '';
 
     console.log(`[Web Album] Album data script length: ${albumDataScript.length}, beacon: ${beaconScript.length}`);
 
-    // Insert the scripts before the closing </head> tag (use regex to handle any whitespace)
+    // Replace the default page title with dynamic title
+    html = html.replace(/<title>.*?<\/title>/, `<title>${pageTitle}</title>`);
+
+    // Insert the meta tags and scripts before the closing </head> tag (use regex to handle any whitespace)
     const beforeReplace = html.length;
-    html = html.replace(/\s*<\/head>/, `${albumDataScript}${beaconScript}\n  </head>`);
+    html = html.replace(/\s*<\/head>/, `${metaTags}${albumDataScript}${beaconScript}\n  </head>`);
     const afterReplace = html.length;
 
     console.log(`[Web Album] HTML injection: before=${beforeReplace}, after=${afterReplace}, injected=${afterReplace > beforeReplace}`);

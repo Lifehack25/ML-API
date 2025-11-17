@@ -98,20 +98,20 @@ export const createWebAlbumRoutes = () => {
 
     // Generate Open Graph and Twitter Card meta tags
     const faviconUrl = 'https://album.memorylocks.com/Resources/favicon.webp?v=2';
-    const ogImageUrl = mainImageUrl || faviconUrl; // Fallback to favicon if no main image
 
     const metaTags = `
+    <link rel="icon" href="${faviconUrl}" type="image/webp">
+    <link rel="apple-touch-icon" href="${faviconUrl}">
     <meta property="og:title" content="${pageTitle}">
     <meta property="og:type" content="website">
     <meta property="og:url" content="https://album.memorylocks.com/?id=${lockId}">
     <meta property="og:description" content="View your Memory Locks photo album">
-    <meta property="og:image" content="${ogImageUrl}">
-    <meta property="og:image:width" content="512">
-    <meta property="og:image:height" content="512">
+    ${mainImageUrl ? `<meta property="og:image" content="${mainImageUrl}">` : `<meta property="og:image" content="${faviconUrl}">`}
+    ${mainImageUrl ? `<meta property="og:image:width" content="1200">\n    <meta property="og:image:height" content="1200">` : `<meta property="og:image:width" content="512">\n    <meta property="og:image:height" content="512">`}
     <meta name="twitter:card" content="summary_large_image">
     <meta name="twitter:title" content="${pageTitle}">
     <meta name="twitter:description" content="View your Memory Locks photo album">
-    <meta name="twitter:image" content="${ogImageUrl}">`;
+    ${mainImageUrl ? `<meta name="twitter:image" content="${mainImageUrl}">` : `<meta name="twitter:image" content="${faviconUrl}">`}`;
 
     // Inject album data into the HTML (only if data was successfully fetched)
     const albumDataScript = result.ok ? `

@@ -97,7 +97,7 @@ export const createWebAlbumRoutes = () => {
     const pageTitle = result.ok ? result.data.AlbumTitle : 'Memory Locks Album';
 
     // Generate Open Graph and Twitter Card meta tags
-    const faviconUrl = 'https://album.memorylocks.com/Resources/favicon.webp?v=2';
+    const faviconUrl = 'https://album.memorylocks.com/Resources/favicon.webp';
 
     const metaTags = `
     <link rel="icon" href="${faviconUrl}" type="image/webp">

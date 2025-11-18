@@ -129,6 +129,14 @@ export const createLockRoutes = (config: AppConfig) => {
         return ownership;
       }
       const result = await getContainer(c).services.locks.toggleSealDate(lockId);
+
+      // Invalidate album cache immediately after successful seal/unseal
+      if (result.ok) {
+        const container = getContainer(c);
+        const hashedId = container.hashids.encode(lockId);
+        await invalidateAlbumCache(hashedId);
+      }
+
       if (result.ok) {
         return c.json(result.data, result.status ?? 200);
       }
@@ -217,7 +225,7 @@ export const createLockRoutes = (config: AppConfig) => {
       if (result.ok) {
         const container = getContainer(c);
         const hashedId = container.hashids.encode(payload.lockId);
-        await invalidateAlbumCache(hashedId, container.config.cloudflarePurge);
+        await invalidateAlbumCache(hashedId);
       }
 
       if (result.ok) {

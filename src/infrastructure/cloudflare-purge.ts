@@ -1,16 +1,12 @@
-import type { CloudflarePurgeConfig } from "../config/env";
-
 /**
- * Purge specific album URLs from Cloudflare's edge cache
- * Uses Cloudflare Cache Purge API with limited-scope token
+ * Purge specific album URLs from Cloudflare's Cache API
+ * Deletes cached responses for both regular and owner views
  *
  * @param hashedId - The hashed lock/album ID
- * @param config - Cloudflare purge configuration (zone ID and token)
  * @returns Promise that resolves when purge is complete
  */
 export async function purgeAlbumEdgeCache(
-  hashedId: string,
-  config: CloudflarePurgeConfig
+  hashedId: string
 ): Promise<void> {
   const urls = [
     `https://album.memorylocks.com/?id=${hashedId}`,
@@ -20,30 +16,15 @@ export async function purgeAlbumEdgeCache(
   console.log(`[Cache Purge] Purging ${urls.length} URLs for album ${hashedId}`);
 
   try {
-    const response = await fetch(
-      `https://api.cloudflare.com/client/v4/zones/${config.zoneId}/purge_cache`,
-      {
-        method: "POST",
-        headers: {
-          "Authorization": `Bearer ${config.apiToken}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ files: urls }),
-      }
+    const cache = caches.default;
+    const deletePromises = urls.map(url =>
+      cache.delete(new Request(url, { method: "GET" }))
     );
 
-    const result = await response.json() as {
-      success: boolean;
-      errors: Array<{ code: number; message: string }>;
-    };
+    const results = await Promise.all(deletePromises);
+    const deletedCount = results.filter(Boolean).length;
 
-    if (!result.success) {
-      const errorMessages = result.errors.map((e) => `[${e.code}] ${e.message}`).join(", ");
-      console.error(`[Cache Purge] Failed to purge album ${hashedId}: ${errorMessages}`);
-      throw new Error(`Cache purge failed: ${errorMessages}`);
-    }
-
-    console.log(`[Cache Purge] Successfully purged album ${hashedId}`);
+    console.log(`[Cache Purge] Successfully purged ${deletedCount}/${urls.length} cached entries for album ${hashedId}`);
   } catch (error) {
     console.error(`[Cache Purge] Error purging album ${hashedId}:`, error);
     throw error;

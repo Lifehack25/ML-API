@@ -65,7 +65,24 @@ export const createWebAlbumRoutes = () => {
       return c.json({ error: "Album ID is required. Please provide ?id=YOUR_ALBUM_ID" } as ApiError, 400);
     }
 
-    console.log(`[Web Album] Request for lockId: ${lockId}, isOwner: ${isOwner}, host: ${host}`);
+    // Try to get cached response from Cloudflare edge cache
+    const cache = caches.default;
+    const cacheKey = new Request(c.req.url, { method: "GET" });
+    const cachedResponse = await cache.match(cacheKey);
+
+    if (cachedResponse) {
+      console.log(`[Web Album] Cache HIT for lockId: ${lockId}`);
+      // Clone and update cache status header
+      const headers = new Headers(cachedResponse.headers);
+      headers.set("X-Cache-Status", "HIT");
+      return new Response(cachedResponse.body, {
+        status: cachedResponse.status,
+        statusText: cachedResponse.statusText,
+        headers
+      });
+    }
+
+    console.log(`[Web Album] Cache MISS for lockId: ${lockId}, isOwner: ${isOwner}, host: ${host}`);
 
     // Fetch album data using the ViewAlbumService
     const result = await container.services.albums.getAlbumData(lockId);
@@ -164,15 +181,20 @@ export const createWebAlbumRoutes = () => {
     // Note: Scan counting is handled by client-side beacon (/scan-beacon)
     // This allows edge caching while still tracking all visitor views
 
-    // Enable Cloudflare edge caching - cached responses will bypass the worker
-    return new Response(html, {
+    // Create response with cache headers
+    const response = new Response(html, {
       status: 200,
       headers: {
         "Content-Type": "text/html; charset=utf-8",
-        "Cache-Control": "public, max-age=604800, s-maxage=604800", // 7 days
-        "X-Cache-Status": "MISS", // Will be HIT on subsequent requests from edge
+        "Cache-Control": "public, max-age=604800", // 7 days - instructs cache to store
+        "X-Cache-Status": "MISS",
       },
     });
+
+    // Store in Cloudflare edge cache for 7 days
+    ctx.waitUntil(cache.put(cacheKey, response.clone()));
+
+    return response;
   });
 
   // Serve static assets (CSS, JS, images, audio, etc.)

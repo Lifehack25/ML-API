@@ -20,7 +20,6 @@ head_sampling_rate = 1
 
 [vars]
 APPLE_BUNDLE_ID = "com.memorylocks.mlmobileapp"
-CLOUDFLARE_ZONE_ID = "d9473d753e5d41baea915d31999036a4"
 
 [[d1_databases]]
 binding = "DB"

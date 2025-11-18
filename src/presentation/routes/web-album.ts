@@ -106,12 +106,13 @@ export const createWebAlbumRoutes = () => {
     <meta property="og:type" content="website">
     <meta property="og:url" content="https://album.memorylocks.com/?id=${lockId}">
     <meta property="og:description" content="View your Memory Locks photo album">
-    ${mainImageUrl ? `<meta property="og:image" content="${mainImageUrl}">` : `<meta property="og:image" content="${faviconUrl}">`}
-    ${mainImageUrl ? `<meta property="og:image:width" content="1200">\n    <meta property="og:image:height" content="1200">` : `<meta property="og:image:width" content="512">\n    <meta property="og:image:height" content="512">`}
+    ${mainImageUrl ? `<meta property="og:image" content="${mainImageUrl}">
+    <meta property="og:image:width" content="1200">
+    <meta property="og:image:height" content="1200">` : ''}
     <meta name="twitter:card" content="summary_large_image">
     <meta name="twitter:title" content="${pageTitle}">
     <meta name="twitter:description" content="View your Memory Locks photo album">
-    ${mainImageUrl ? `<meta name="twitter:image" content="${mainImageUrl}">` : `<meta name="twitter:image" content="${faviconUrl}">`}`;
+    ${mainImageUrl ? `<meta name="twitter:image" content="${mainImageUrl}">` : ''}`;
 
     // Inject album data into the HTML (only if data was successfully fetched)
     const albumDataScript = result.ok ? `

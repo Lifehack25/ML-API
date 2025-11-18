@@ -14,39 +14,6 @@ const ALBUM_HOST = "album.memorylocks.com";
 export const createWebAlbumRoutes = () => {
   const router = new Hono<{ Bindings: EnvBindings; Variables: AppVariables }>();
 
-  // Lightweight beacon endpoint for tracking scans (bypasses cache)
-  router.post("/scan-beacon", async (c) => {
-    const host = c.req.header("host");
-    if (host !== "album.memorylocks.com") {
-      return c.json({ error: "Invalid host" }, 400);
-    }
-
-    const lockId = c.req.query("id");
-    if (!lockId) {
-      return c.json({ error: "Missing id" }, 400);
-    }
-
-    const container = getContainer(c);
-    const ctx = c.get("executionCtx");
-    const numericLockId = container.services.albums.decodeLockId(lockId);
-
-    if (numericLockId && ctx) {
-      // Increment scan counter asynchronously (don't block response)
-      ctx.waitUntil(
-        container.services.scanCounter.incrementScanAndNotify(numericLockId)
-      );
-    }
-
-    // Return minimal response with no-cache headers
-    return new Response(null, {
-      status: 204,
-      headers: {
-        "Cache-Control": "no-store, no-cache, must-revalidate, private",
-        "Access-Control-Allow-Origin": "https://album.memorylocks.com",
-      },
-    });
-  });
-
   // Serve album HTML with server-side rendered data
   router.get("/", async (c, next: Next) => {
     // Only handle requests for album.memorylocks.com
@@ -91,6 +58,17 @@ export const createWebAlbumRoutes = () => {
 
     if (!result.ok) {
       console.log(`[Web Album] Error fetching album: ${result.error.message}`);
+    }
+
+    // Track scan for visitor views (not owners, only successful data loads)
+    if (!isOwner && result.ok && ctx) {
+      const numericLockId = container.services.albums.decodeLockId(lockId);
+      if (numericLockId) {
+        // Increment scan counter asynchronously (don't block response)
+        ctx.waitUntil(
+          container.services.scanCounter.incrementScanAndNotify(numericLockId)
+        );
+      }
     }
 
     // Always fetch the HTML template from the assets binding (even if no data)
@@ -141,31 +119,14 @@ export const createWebAlbumRoutes = () => {
       window.IS_OWNER = ${isOwner};
     </script>`;
 
-    // Inject scan beacon for visitor views only (not for owners)
-    // Only fires if ALBUM_DATA exists (prevents beacon on failed data loads)
-    const beaconScript = !isOwner ? `
-    <script>
-      // Fire scan beacon on page load (only for visitors with valid data)
-      if (!window.IS_OWNER && window.ALBUM_DATA) {
-        if (document.readyState === 'loading') {
-          document.addEventListener('DOMContentLoaded', function() {
-            navigator.sendBeacon('/scan-beacon?id=${lockId}');
-          });
-        } else {
-          // Page already loaded, fire immediately
-          navigator.sendBeacon('/scan-beacon?id=${lockId}');
-        }
-      }
-    </script>` : '';
-
-    console.log(`[Web Album] Album data script length: ${albumDataScript.length}, beacon: ${beaconScript.length}`);
+    console.log(`[Web Album] Album data script length: ${albumDataScript.length}`);
 
     // Replace the default page title with dynamic title
     html = html.replace(/<title>.*?<\/title>/, `<title>${pageTitle}</title>`);
 
     // Insert the meta tags and scripts before the closing </head> tag (use regex to handle any whitespace)
     const beforeReplace = html.length;
-    html = html.replace(/\s*<\/head>/, `${metaTags}${albumDataScript}${beaconScript}\n  </head>`);
+    html = html.replace(/\s*<\/head>/, `${metaTags}${albumDataScript}\n  </head>`);
     const afterReplace = html.length;
 
     console.log(`[Web Album] HTML injection: before=${beforeReplace}, after=${afterReplace}, injected=${afterReplace > beforeReplace}`);
@@ -178,9 +139,6 @@ export const createWebAlbumRoutes = () => {
 
     console.log(`[Web Album] Returning HTML response, final length: ${html.length}`);
 
-    // Note: Scan counting is handled by client-side beacon (/scan-beacon)
-    // This allows edge caching while still tracking all visitor views
-
     // Create response with cache headers
     const response = new Response(html, {
       status: 200,
@@ -192,7 +150,9 @@ export const createWebAlbumRoutes = () => {
     });
 
     // Store in Cloudflare edge cache for 7 days
-    ctx.waitUntil(cache.put(cacheKey, response.clone()));
+    if (ctx) {
+      ctx.waitUntil(cache.put(cacheKey, response.clone()));
+    }
 
     return response;
   });

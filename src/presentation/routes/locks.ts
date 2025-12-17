@@ -134,7 +134,14 @@ export const createLockRoutes = (config: AppConfig) => {
       if (result.ok) {
         const container = getContainer(c);
         const hashedId = container.hashids.encode(lockId);
-        await invalidateAlbumCache(hashedId);
+        const config = container.config;
+        if (config.cloudflareCache) {
+          await invalidateAlbumCache(
+            hashedId,
+            config.cloudflareCache.zoneId,
+            config.cloudflareCache.purgeToken
+          );
+        }
       }
 
       if (result.ok) {
@@ -225,7 +232,14 @@ export const createLockRoutes = (config: AppConfig) => {
       if (result.ok) {
         const container = getContainer(c);
         const hashedId = container.hashids.encode(payload.lockId);
-        await invalidateAlbumCache(hashedId);
+        const config = container.config;
+        if (config.cloudflareCache) {
+          await invalidateAlbumCache(
+            hashedId,
+            config.cloudflareCache.zoneId,
+            config.cloudflareCache.purgeToken
+          );
+        }
       }
 
       if (result.ok) {

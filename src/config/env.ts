@@ -29,6 +29,11 @@ export interface CloudflareMediaConfig {
   uploadToken: string;
 }
 
+export interface CloudflareCacheConfig {
+  zoneId: string;
+  purgeToken: string;
+}
+
 export interface FirebaseConfig {
   serviceAccountJson?: string;
 }
@@ -59,6 +64,7 @@ export interface AppConfig {
   twilio?: TwilioConfig;
   sightengine?: SightengineConfig;
   cloudflareMedia?: CloudflareMediaConfig;
+  cloudflareCache?: CloudflareCacheConfig;
   firebase?: FirebaseConfig;
   apple?: AppleConfig;
   google: GoogleConfig;
@@ -97,6 +103,7 @@ export const loadConfig = (env: EnvBindings): AppConfig => {
   const twilioConfigured = !!(env.TWILIO_ACCOUNT_SID && env.TWILIO_AUTH_TOKEN && env.TWILIO_VERIFY_SERVICE_SID);
   const sightengineConfigured = !!(env.SIGHTENGINE_USER && env.SIGHTENGINE_SECRET);
   const cloudflareConfigured = !!(env.CLOUDFLARE_ACCOUNT_ID && env.CLOUDFLARE_UPLOAD_TOKEN);
+  const cloudflareCacheConfigured = !!(env.CLOUDFLARE_ZONE_ID && env.CLOUDFLARE_PURGE_TOKEN);
   const appleConfigured = !!(env.APPLE_BUNDLE_ID && env.APPLE_TEAM_ID && env.APPLE_KEY_ID && env.APPLE_AUTH_KEY_PEM);
 
   return {
@@ -128,6 +135,12 @@ export const loadConfig = (env: EnvBindings): AppConfig => {
       ? {
           accountId: env.CLOUDFLARE_ACCOUNT_ID!,
           uploadToken: env.CLOUDFLARE_UPLOAD_TOKEN!,
+        }
+      : undefined,
+    cloudflareCache: cloudflareCacheConfigured
+      ? {
+          zoneId: env.CLOUDFLARE_ZONE_ID!,
+          purgeToken: env.CLOUDFLARE_PURGE_TOKEN!,
         }
       : undefined,
     firebase: {

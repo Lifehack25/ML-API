@@ -20,10 +20,18 @@ Memory Locks API (ML-API) is a Cloudflare Workers-based edge-native API for mana
 ### Deployment
 Deployment is automated via GitHub Actions. Push to `main` branch to trigger automatic deployment to Cloudflare Workers. Do not use `npm run deploy` directly - let CI/CD handle deployments.
 
-### Database Migrations
+### Database Migrations (Drizzle Kit)
 ```bash
-  wrangler d1 execute DB --remote --file=./db/migrations/XXX_migration_name.sql
+  npm run db:generate     # Generate migration from schema changes
+  npm run db:check        # Check schema consistency
+  wrangler d1 execute DB --remote --file=./drizzle/migrations/XXXX_migration_name.sql
 ```
+
+**Workflow:**
+1. Modify schema in `src/data/schema/`
+2. Run `npm run db:generate` to create migration SQL
+3. Review generated migration in `drizzle/migrations/`
+4. Apply with `wrangler d1 execute DB --remote --file=./drizzle/migrations/XXXX_name.sql`
 
 ### Secrets Management
 Secrets are managed via Wrangler CLI, not in code:
@@ -122,10 +130,26 @@ Media (images/videos) stored in Cloudflare Images/Stream:
 
 ### Caching & Invalidation
 
-Web albums cached at Cloudflare edge for 24 hours. Cache purging:
-- `src/infrastructure/cloudflare-purge.ts`: Calls Cloudflare API to purge by URL
-- `src/infrastructure/cache-invalidation.ts`: Helper to invalidate album cache
-- Called after metadata changes, media uploads, lock name updates
+Web albums use a two-tier caching strategy for global CDN coverage with local optimization:
+
+**Caching Layers:**
+- **Layer 1 (Local)**: `caches.default` - Datacenter-local cache for instant responses in same datacenter
+- **Layer 2 (Global)**: Cloudflare CDN via `fetch()` with `cf.cacheTtl` - Global cache across all edge locations
+
+**Cache Flow:**
+1. External request checks local cache first (instant if HIT)
+2. On local MISS, Worker makes `fetch()` subrequest to self with `cf: { cacheTtl: 604800, cacheEverything: true }`
+3. Subrequest checks global CDN (HIT from any datacenter worldwide)
+4. On global MISS, HTML is generated and cached globally
+5. Response is stored in local cache for future datacenter-local requests
+
+**Cache Purging:**
+- `src/infrastructure/cloudflare-purge.ts`: Calls Cloudflare Purge API to invalidate global CDN + local cache
+- `src/infrastructure/cache-invalidation.ts`: Helper wrapper for cache invalidation
+- Called after metadata changes (publish), seal/unseal operations
+- Uses `CLOUDFLARE_ZONE_ID` and `CLOUDFLARE_PURGE_TOKEN` secrets
+
+**Cache Duration:** 7 days for both global CDN and local cache
 
 ### Scan Tracking with Edge Bypass
 
@@ -145,14 +169,19 @@ Configuration loaded from environment variables in `src/config/env.ts`. Required
 Optional secrets enable features:
 - Twilio: `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, `TWILIO_VERIFY_SERVICE_SID`
 - Cloudflare Media: `CLOUDFLARE_ACCOUNT_ID`, `CLOUDFLARE_UPLOAD_TOKEN`
-- Cloudflare Purge: `CLOUDFLARE_ZONE_ID`, `CLOUDFLARE_PURGE_TOKEN`
+- Cloudflare Cache: `CLOUDFLARE_ZONE_ID`, `CLOUDFLARE_PURGE_TOKEN` (required for global cache purging)
 - Firebase: `FIREBASE_SERVICE_ACCOUNT_JSON`
 - Apple OAuth: `APPLE_BUNDLE_ID`, `APPLE_TEAM_ID`, `APPLE_KEY_ID`, `APPLE_AUTH_KEY_PEM`
 - Google OAuth: `GOOGLE_ANDROID_CLIENT_ID`, `GOOGLE_IOS_CLIENT_ID`
 
 ## Database
 
-Cloudflare D1 (SQLite) with Drizzle ORM. Schema is in `db/schema.sql` with migrations in `db/migrations/`.
+Cloudflare D1 (SQLite) with Drizzle ORM and Drizzle Kit for migrations.
+
+- **Schema definitions**: `src/data/schema/` (TypeScript, source of truth)
+- **Generated migrations**: `drizzle/migrations/`
+- **Drizzle config**: `drizzle.config.ts`
+- **Archived legacy migrations**: `db/migrations-archive/` (historical reference only)
 
 Key tables:
 - `users`: User accounts with auth provider info
@@ -170,12 +199,12 @@ Tests use Vitest. Currently no test files in repo - when adding tests, place in 
 
 ## Edge Cases & Quirks
 
-1. **Album caching**: Web albums are cached for 24 hours at edge. Always invalidate cache after metadata changes via `invalidateAlbumCache()`.
+1. **Album caching**: Web albums are cached for 7 days at edge. Always invalidate cache after metadata changes via `invalidateAlbumCache()`.
 
-2. **Cron schedule mismatch**: `wrangler.toml` defines cron as `0 */12 * * *` but `src/index.ts` checks for `*/15 * * * *`. Update code to match config.
+2. **Storage limits**: Tiered storage limits defined in `src/config/env.ts` storageLimits. Tier 1: 50 images + 60s video. Tier 2: 100 images + 120s video.
 
-3. **Storage limits**: Tiered storage limits defined in `src/config/env.ts` storageLimits. Tier 1: 50 images + 60s video. Tier 2: 100 images + 120s video.
+3. **Media object deletion**: Never delete media_objects directly - always use `ManageMediaService` to create cleanup jobs for Cloudflare resources.
 
-4. **Media object deletion**: Never delete media_objects directly - always use `ManageMediaService` to create cleanup jobs for Cloudflare resources.
+4. **HashIds are NOT UUIDs**: They're deterministic encodings of numeric IDs. Same ID always produces same hash. Use `hashids.encode(id)` and `hashids.decode(hash)`.
 
-5. **HashIds are NOT UUIDs**: They're deterministic encodings of numeric IDs. Same ID always produces same hash. Use `hashids.encode(id)` and `hashids.decode(hash)`.
+5. **Cache purging**: Cache invalidation purges both global CDN (across all edge locations) and datacenter-local cache. Global purge may take a few seconds to propagate. The X-Cache-Status header indicates cache layer: LOCAL-HIT (datacenter cache), GLOBAL-HIT (CDN cache), or GENERATED (cache miss).

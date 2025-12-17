@@ -95,8 +95,8 @@ export default {
 
   async scheduled(event: ScheduledEvent, env: EnvBindings, ctx: ExecutionContext) {
     try {
-      if (event.cron === "*/15 * * * *") {
-        // Every 15 minutes: process Cloudflare cleanup jobs
+      if (event.cron === "0 */12 * * *") {
+        // Every 12 hours: process Cloudflare cleanup jobs
         await processCleanupJobs(env, ctx);
       }
     } catch (error) {

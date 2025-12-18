@@ -23,6 +23,10 @@ const createJwtMiddleware = (config: AppConfig) =>
   jwt({
     secret: config.jwt.secret,
     alg: "HS256",
+    verification: {
+      iss: config.jwt.issuer,
+      aud: config.jwt.audience,
+    },
   });
 
 //---------------------------------------------- Validation ----------------------------------------------

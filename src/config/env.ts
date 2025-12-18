@@ -111,7 +111,7 @@ export const loadConfig = (env: EnvBindings): AppConfig => {
       secret: env.JWT_SECRET,
       issuer: "ML-API",
       audience: "ML-MobileApp",
-      accessTokenExpiryHours: 2,
+      accessTokenExpiryHours: 24,
       refreshTokenExpiryDays: 30,
     },
     hashids: {

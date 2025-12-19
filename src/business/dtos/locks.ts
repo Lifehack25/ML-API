@@ -7,6 +7,8 @@ export interface LockSummary {
   sealDate: DateOnlyString | null;
   scanCount: number;
   upgradedStorage: boolean;
+  geoLocation: { lat: number; lng: number } | null;
+  image: string | null;
 }
 
 export interface LockConnectUserRequest {

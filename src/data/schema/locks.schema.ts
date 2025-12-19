@@ -18,6 +18,8 @@ export const locks = sqliteTable(
       onDelete: "set null",
     }),
     upgraded_storage: integer("upgraded_storage").notNull().default(0),
+    geo_location: text("geo_location"),
+    image: text("image"),
   },
   (table) => ({
     userIdIdx: index("idx_locks_user_id").on(table.user_id),

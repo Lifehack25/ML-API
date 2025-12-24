@@ -94,10 +94,10 @@ export const createWebAlbumRoutes = () => {
     const pageTitle = result.ok ? result.data.AlbumTitle : 'Memory Locks Album';
 
     // Generate Open Graph and Twitter Card meta tags
-    const faviconUrl = 'https://album.memorylocks.com/Resources/favicon.webp';
+    const faviconUrl = 'https://imagedelivery.net/Fh6D8c3CvE0G8hv20vsbkw/597a1111-f618-4e91-463c-1cadc1201c00/icon';
 
     const metaTags = `
-    <link rel="icon" href="${faviconUrl}" type="image/webp">
+    <link rel="icon" href="${faviconUrl}" type="image/png">
     <link rel="apple-touch-icon" href="${faviconUrl}">
     <meta property="og:title" content="${pageTitle}">
     <meta property="og:type" content="website">

@@ -32,72 +32,25 @@ export const createWebAlbumRoutes = () => {
       return c.json({ error: "Album ID is required. Please provide ?id=YOUR_ALBUM_ID" } as ApiError, 400);
     }
 
-    // Check if this is an internal subrequest (from fetch() below)
-    const isInternalRequest = c.req.header("X-Internal-Request") === "true";
+    // Check local datacenter cache first
+    const cache = caches.default;
+    const cacheKey = new Request(c.req.url, { method: "GET" });
+    const cachedResponse = await cache.match(cacheKey);
 
-    if (isInternalRequest) {
-      // This is a subrequest - skip caching layers and generate HTML directly
-      console.log(`[Web Album] Internal request for lockId: ${lockId}, isOwner: ${isOwner}`);
-      // Continue to HTML generation below...
-    } else {
-      // External request - check local cache first (Layer 1)
-      const cache = caches.default;
-      const cacheKey = new Request(c.req.url, { method: "GET" });
-      const cachedResponse = await cache.match(cacheKey);
-
-      if (cachedResponse) {
-        console.log(`[Web Album] LOCAL cache HIT for lockId: ${lockId}`);
-        // Clone and update cache status header
-        const headers = new Headers(cachedResponse.headers);
-        headers.set("X-Cache-Status", "LOCAL-HIT");
-        return new Response(cachedResponse.body, {
-          status: cachedResponse.status,
-          statusText: cachedResponse.statusText,
-          headers
-        });
-      }
-
-      console.log(`[Web Album] LOCAL cache MISS for lockId: ${lockId}, checking global CDN...`);
-
-      // Layer 2: Make subrequest to self with global CDN caching
-      const subrequest = new Request(c.req.url, {
-        method: "GET",
-        headers: {
-          "X-Internal-Request": "true",
-          "host": ALBUM_HOST,
-        }
-      });
-
-      const response = await fetch(subrequest, {
-        cf: {
-          cacheTtl: 604800,        // 7 days in global CDN
-          cacheEverything: true,   // Cache HTML responses
-        }
-      });
-
-      // Update cache status header
-      const headers = new Headers(response.headers);
-      const cfCacheStatus = response.headers.get("CF-Cache-Status");
-      headers.set("X-Cache-Status", cfCacheStatus === "HIT" ? "GLOBAL-HIT" : "GLOBAL-MISS");
-
-      // Clone the response for local caching
-      const responseClone = response.clone();
-
-      // Store in local cache for next datacenter-local request (async)
-      if (ctx) {
-        ctx.waitUntil(cache.put(cacheKey, responseClone));
-      }
-
-      console.log(`[Web Album] Global CDN status: ${cfCacheStatus || "MISS"}`);
-
-      return new Response(response.body, {
-        status: response.status,
-        statusText: response.statusText,
+    if (cachedResponse) {
+      console.log(`[Web Album] Cache HIT for lockId: ${lockId}`);
+      const headers = new Headers(cachedResponse.headers);
+      headers.set("X-Cache-Status", "HIT");
+      return new Response(cachedResponse.body, {
+        status: cachedResponse.status,
+        statusText: cachedResponse.statusText,
         headers
       });
     }
 
-    // HTML generation (for internal subrequests or direct misses)
+    console.log(`[Web Album] Cache MISS for lockId: ${lockId}, generating HTML...`);
+
+    // HTML generation (cache miss)
     console.log(`[Web Album] Generating HTML for lockId: ${lockId}, isOwner: ${isOwner}`);
 
     // Fetch album data using the ViewAlbumService
@@ -189,16 +142,19 @@ export const createWebAlbumRoutes = () => {
     console.log(`[Web Album] Returning HTML response, final length: ${html.length}`);
 
     // Create response with cache headers
-    // Note: Cache-Control here is for browser caching, not CDN caching
-    // CDN caching is controlled by the fetch() cf.cacheTtl option above
     const response = new Response(html, {
       status: 200,
       headers: {
         "Content-Type": "text/html; charset=utf-8",
-        "Cache-Control": "public, max-age=604800", // 7 days - for browser caching
-        "X-Cache-Status": "GENERATED",
+        "Cache-Control": "public, max-age=604800", // 7 days - browser and CDN caching
+        "X-Cache-Status": "MISS",
       },
     });
+
+    // Store in local cache asynchronously
+    if (ctx) {
+      ctx.waitUntil(cache.put(cacheKey, response.clone()));
+    }
 
     return response;
   });

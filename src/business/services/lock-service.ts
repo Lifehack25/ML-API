@@ -79,6 +79,28 @@ export class LockService {
     );
   }
 
+  async updateGeoLocation(
+    lockId: number,
+    geoLocation: { lat: number; lng: number }
+  ): Promise<ServiceResult<LockSummary>> {
+    const existing = await this.lockRepository.findById(lockId);
+    if (!existing) {
+      return failure("LOCK_NOT_FOUND", "Lock not found", undefined, 404);
+    }
+
+    const geoLocationJson = JSON.stringify(geoLocation);
+
+    const updated = await this.lockRepository.update(lockId, {
+      geo_location: geoLocationJson,
+    });
+
+    const message = existing.geo_location
+      ? "Geo location updated successfully"
+      : "Geo location set successfully";
+
+    return success(mapLockRowToSummary(updated, this.hashids), message);
+  }
+
   async upgradeStorage(lockId: number): Promise<ServiceResult<LockSummary>> {
     const existing = await this.lockRepository.findById(lockId);
     if (!existing) {

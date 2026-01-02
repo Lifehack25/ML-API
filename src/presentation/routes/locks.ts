@@ -156,6 +156,41 @@ export const createLockRoutes = (config: AppConfig) => {
     }
   );
 
+  // Update geo location for a lock
+  router.patch(
+    "/:lockId{[0-9]+}/geo-location",
+    jwtMiddleware,
+    attachUser,
+    requireNumericParam("lockId", { min: 1, message: "Invalid lock ID" }),
+    validateJson(z.object({
+      geoLocation: z.object({
+        lat: z.number().min(-90).max(90),
+        lng: z.number().min(-180).max(180),
+      }),
+    })),
+    async (c) => {
+      const { lockId } = c.req.valid("param") as { lockId: number };
+      const { geoLocation } = c.req.valid("json") as { geoLocation: { lat: number; lng: number } };
+
+      const ownership = await ensureLockOwnership(c, lockId);
+      if (ownership !== true) {
+        return ownership;
+      }
+
+      const result = await getContainer(c).services.locks.updateGeoLocation(lockId, geoLocation);
+
+      if (result.ok) {
+        return c.json(result.data, result.status ?? 200);
+      }
+      const errorResponse: ApiError = {
+        error: result.error.message,
+        code: result.error.code,
+        details: result.error.details,
+      };
+      return c.json(errorResponse, result.status ?? 400);
+    }
+  );
+
   // Upgrade lock storage tier using a path parameter.
   router.patch(
     "/upgrade-storage/:lockId{[0-9]+}",

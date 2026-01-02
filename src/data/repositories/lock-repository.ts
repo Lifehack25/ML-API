@@ -15,6 +15,7 @@ export interface LockUpdateRequest {
   seal_date?: string | null;
   user_id?: number | null;
   upgraded_storage?: boolean;
+  geo_location?: string | null;
 }
 
 export class LockRepository {
@@ -99,6 +100,10 @@ export class LockRepository {
 
     if (data.upgraded_storage !== undefined) {
       updates.upgraded_storage = data.upgraded_storage ? 1 : 0;
+    }
+
+    if (data.geo_location !== undefined) {
+      updates.geo_location = data.geo_location;
     }
 
     if (Object.keys(updates).length === 0) {

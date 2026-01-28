@@ -24,6 +24,7 @@ import { ViewAlbumService } from "../business/services/view-album-service";
 import { UserAuthFlowService } from "../business/services/user-auth-flow-service";
 import { UserService } from "../business/services/user-service";
 import { ScanCounterService } from "../business/services/scan-counter-service";
+import { RevenueCatWebhookService } from "../business/services/revenuecat-webhook-service";
 import type { Logger } from "./logger";
 
 export interface ServiceContainer {
@@ -45,6 +46,7 @@ export interface ServiceContainer {
     albums: ViewAlbumService;
     notifications: NotificationService;
     scanCounter: ScanCounterService;
+    revenueCat: RevenueCatWebhookService;
   };
 }
 
@@ -145,6 +147,8 @@ export const createRequestContext = (
     logger
   );
 
+  const revenueCatWebhookService = new RevenueCatWebhookService(lockRepository, logger);
+
   return {
     config,
     logger,
@@ -164,6 +168,7 @@ export const createRequestContext = (
       albums: albumService,
       notifications: notificationService,
       scanCounter: scanCounterService,
+      revenueCat: revenueCatWebhookService,
     },
   };
 };

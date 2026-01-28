@@ -39,6 +39,9 @@ export interface EnvBindings {
   GOOGLE_ANDROID_CLIENT_ID?: string;
   GOOGLE_IOS_CLIENT_ID?: string;
 
+  // RevenueCat
+  REVENUECAT_WEBHOOK_AUTH_KEY?: string;
+
   // Environment
   ENVIRONMENT?: string;
 }

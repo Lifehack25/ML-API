@@ -50,6 +50,10 @@ export interface GoogleConfig {
   iosClientId?: string;
 }
 
+export interface RevenueCatConfig {
+  webhookAuthKey: string;
+}
+
 export interface StorageLimits {
   tier1ImageLimit: number;
   tier1VideoSeconds: number;
@@ -68,6 +72,7 @@ export interface AppConfig {
   firebase?: FirebaseConfig;
   apple?: AppleConfig;
   google: GoogleConfig;
+  revenueCat?: RevenueCatConfig;
   createLockApiKey: string;
   pushNotificationKey: string;
   environment: string;
@@ -105,6 +110,7 @@ export const loadConfig = (env: EnvBindings): AppConfig => {
   const cloudflareConfigured = !!(env.CLOUDFLARE_ACCOUNT_ID && env.CLOUDFLARE_UPLOAD_TOKEN);
   const cloudflareCacheConfigured = !!(env.CLOUDFLARE_ZONE_ID && env.CLOUDFLARE_PURGE_TOKEN);
   const appleConfigured = !!(env.APPLE_BUNDLE_ID && env.APPLE_TEAM_ID && env.APPLE_KEY_ID && env.APPLE_AUTH_KEY_PEM);
+  const revenueCatConfigured = !!env.REVENUECAT_WEBHOOK_AUTH_KEY;
 
   return {
     jwt: {
@@ -158,6 +164,11 @@ export const loadConfig = (env: EnvBindings): AppConfig => {
       androidClientId: env.GOOGLE_ANDROID_CLIENT_ID,
       iosClientId: env.GOOGLE_IOS_CLIENT_ID,
     },
+    revenueCat: revenueCatConfigured
+      ? {
+          webhookAuthKey: env.REVENUECAT_WEBHOOK_AUTH_KEY!,
+        }
+      : undefined,
     storageLimits: {
       tier1ImageLimit: 50,
       tier1VideoSeconds: 60,

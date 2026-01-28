@@ -14,6 +14,7 @@ import { createMediaObjectRoutes } from "./presentation/routes/mediaObjects";
 import { createAlbumRoutes } from "./presentation/routes/albums";
 import { createWebAlbumRoutes } from "./presentation/routes/web-album";
 import { createPushNotificationRoutes } from "./presentation/routes/pushNotifications";
+import { createRevenueCatRoutes } from "./presentation/routes/revenuecat";
 import { processCleanupJobs } from "./jobs/process-cleanup-jobs";
 
 let appInstance: Hono<{ Bindings: EnvBindings; Variables: AppVariables }> | null = null;
@@ -65,6 +66,8 @@ const buildApp = (config: AppConfig) => {
   app.route("/album", createAlbumRoutes(config));
 
   app.route("/push-notifications", createPushNotificationRoutes(config));
+
+  app.route("/", createRevenueCatRoutes(config));
 
   app.notFound((c) => {
     const response = {

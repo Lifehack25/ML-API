@@ -113,3 +113,40 @@ export const idempotencyMiddleware: MiddlewareHandler = async (c, next) => {
     }
   }
 };
+
+/**
+ * RevenueCat webhook authentication middleware.
+ *
+ * Validates the Authorization header against configured webhook auth key.
+ *
+ * Usage:
+ * ```typescript
+ * app.post("/webhooks/revenuecat", revenueCatWebhookAuth(config), async (c) => {
+ *   // Handler logic
+ * });
+ * ```
+ */
+export const createRevenueCatWebhookAuth = (config: AppConfig): MiddlewareHandler => {
+  return async (c, next) => {
+    if (!config.revenueCat) {
+      return c.json({ error: "RevenueCat not configured" } as ApiError, 503);
+    }
+
+    const authHeader = c.req.header("Authorization");
+    if (!authHeader) {
+      return c.json({ error: "Authorization header required" } as ApiError, 401);
+    }
+
+    // RevenueCat sends: Authorization: Bearer <webhook_auth_key>
+    // We accept both "Bearer <key>" and just "<key>" for flexibility
+    const providedKey = authHeader.startsWith("Bearer ")
+      ? authHeader.substring(7).trim()
+      : authHeader.trim();
+
+    if (providedKey !== config.revenueCat.webhookAuthKey) {
+      return c.json({ error: "Invalid webhook authorization" } as ApiError, 401);
+    }
+
+    return await next();
+  };
+};

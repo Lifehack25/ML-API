@@ -245,6 +245,8 @@ export const createUserRoutes = (config: AppConfig) => {
   // Verify email or phone for the authenticated user.
   router.post(
     "/verify/identifier",
+    jwtMiddleware,
+    setUserContext(),
     idempotencyMiddleware,
     validateJson(verifyIdentifierSchema),
     async (c) => {

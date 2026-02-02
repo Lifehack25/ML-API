@@ -222,6 +222,28 @@ export const createUserRoutes = (config: AppConfig) => {
       return c.json(errorResponse, result.status ?? 400);
   });
 
+  // Remove an identifier (email or phone) from the authenticated user's account.
+  router.delete(
+    "/me/identifier",
+    jwtMiddleware,
+    setUserContext(),
+    booleanQuery("isEmail"),
+    async (c) => {
+      const userId = getUserId(c);
+      const { isEmail } = c.req.valid("query") as { isEmail: boolean };
+      const result = await getService(c).services.users.removeIdentifier({ userId, isEmail });
+      if (result.ok) {
+        return c.json(result.data, result.status ?? 200);
+      }
+      const errorResponse: ApiError = {
+        error: result.error.message,
+        code: result.error.code,
+        details: result.error.details,
+      };
+      return c.json(errorResponse, result.status ?? 400);
+    }
+  );
+
   // Update the authenticated user's display name.
   router.patch(
     "/me/name",

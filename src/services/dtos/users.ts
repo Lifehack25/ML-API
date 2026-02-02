@@ -57,6 +57,11 @@ export interface VerifyIdentifierRequest {
   verifyCode: string;
 }
 
+export interface RemoveIdentifierRequest {
+  userId: number;
+  isEmail: boolean;
+}
+
 export interface UpdateDeviceTokenRequest {
   deviceToken: string;
 }

@@ -9,6 +9,7 @@ import type { DrizzleClient } from "../../data/db";
 import { users, locks, mediaObjects } from "../../data/schema";
 import { eq } from "drizzle-orm";
 import type {
+  RemoveIdentifierRequest,
   UpdateDeviceTokenRequest,
   UpdateUserNameRequest,
   UserProfile,
@@ -132,6 +133,34 @@ export class UserService {
       this.logger.error("Failed to verify identifier", { userId: request.userId, error: errorMsg });
       return failure("VERIFY_FAILED", "Failed to verify identifier", undefined, 500);
     }
+  }
+
+  async removeIdentifier(request: RemoveIdentifierRequest): Promise<ServiceResult<boolean>> {
+    const user = await this.userRepository.findById(request.userId);
+    if (!user) {
+      return failure("USER_NOT_FOUND", "User not found", undefined, 404);
+    }
+
+    const hasEmail = !!(user.email && user.email_verified);
+    const hasPhone = !!(user.phone_number && user.phone_verified);
+
+    if (request.isEmail) {
+      if (!hasPhone) {
+        return failure("CANNOT_REMOVE_LAST", "Cannot remove the last verified identifier. You must have at least one verified email or phone number.", undefined, 400);
+      }
+      await this.db.update(users)
+        .set({ email: null, email_verified: false })
+        .where(eq(users.id, request.userId));
+    } else {
+      if (!hasEmail) {
+        return failure("CANNOT_REMOVE_LAST", "Cannot remove the last verified identifier. You must have at least one verified email or phone number.", undefined, 400);
+      }
+      await this.db.update(users)
+        .set({ phone_number: null, phone_verified: false })
+        .where(eq(users.id, request.userId));
+    }
+
+    return success(true, "Identifier removed successfully");
   }
 
   async updateDeviceToken(userId: number, request: UpdateDeviceTokenRequest): Promise<ServiceResult<boolean>> {

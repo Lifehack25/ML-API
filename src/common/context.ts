@@ -15,16 +15,16 @@ import { UserRepository } from "../data/repositories/user-repository";
 import { LockRepository } from "../data/repositories/lock-repository";
 import { MediaObjectRepository } from "../data/repositories/media-object-repository";
 import { CleanupJobRepository } from "../data/repositories/cleanup-job-repository";
-import { ManageMediaService } from "../business/services/manage-media-service";
-import { LockService } from "../business/services/lock-service";
-import { SessionTokenService } from "../business/services/session-token-service";
-import { OAuthUserLinkService } from "../business/services/oauth-user-link-service";
-import { NotificationService } from "../business/services/notification-service";
-import { ViewAlbumService } from "../business/services/view-album-service";
-import { UserAuthFlowService } from "../business/services/user-auth-flow-service";
-import { UserService } from "../business/services/user-service";
-import { ScanCounterService } from "../business/services/scan-counter-service";
-import { RevenueCatWebhookService } from "../business/services/revenuecat-webhook-service";
+import { ManageMediaService } from "../services/services/manage-media-service";
+import { LockService } from "../services/services/lock-service";
+import { SessionTokenService } from "../services/services/session-token-service";
+import { OAuthUserLinkService } from "../services/services/oauth-user-link-service";
+import { NotificationService } from "../services/services/notification-service";
+import { ViewAlbumService } from "../services/services/view-album-service";
+import { UserAuthFlowService } from "../services/services/user-auth-flow-service";
+import { UserService } from "../services/services/user-service";
+import { ScanCounterService } from "../services/services/scan-counter-service";
+import { RevenueCatWebhookService } from "../services/services/revenuecat-webhook-service";
 import type { Logger } from "./logger";
 
 export interface ServiceContainer {

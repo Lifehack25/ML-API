@@ -1,5 +1,5 @@
 import type { Lock } from "../schema";
-import type { LockSummary, DateOnlyString } from "../../business/dtos/locks";
+import type { LockSummary, DateOnlyString } from "../../services/dtos/locks";
 import type { HashIdHelper } from "../../common/hashids";
 
 const bool = (value: number | boolean): boolean =>

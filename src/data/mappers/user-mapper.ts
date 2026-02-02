@@ -1,5 +1,5 @@
 import type { User } from "../schema";
-import type { UserProfile } from "../../business/dtos/users";
+import type { UserProfile } from "../../services/dtos/users";
 
 const toBoolean = (value: number | boolean | null | undefined): boolean => {
   if (typeof value === "boolean") return value;

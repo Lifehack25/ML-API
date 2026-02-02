@@ -12,8 +12,8 @@ import type {
   LockConnectUserRequest,
   PublishMetadataRequest,
   UpdateLockNameRequest,
-} from "../../business/dtos/locks";
-import { MetadataChangeType } from "../../business/dtos/locks";
+} from "../../services/dtos/locks";
+import { MetadataChangeType } from "../../services/dtos/locks";
 import { mapLockRowToSummary } from "../../data/mappers/lock-mapper";
 import { requireNumericParam, validateJson } from "../http/validation";
 import { invalidateAlbumCache } from "../../infrastructure/cache-invalidation";

@@ -1,6 +1,6 @@
 import type { MediaObject } from "../schema";
-import type { CreatedMedia } from "../../business/dtos/locks";
-import type { AlbumMedia } from "../../business/dtos/albums";
+import type { CreatedMedia } from "../../services/dtos/locks";
+import type { AlbumMedia } from "../../services/dtos/albums";
 
 const bool = (value: number | boolean): boolean =>
   typeof value === "boolean" ? value : value !== 0;

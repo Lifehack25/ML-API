@@ -1,7 +1,7 @@
 import { eq, and, sql } from "drizzle-orm";
 import type { DrizzleClient } from "../db";
 import { users, type User } from "../schema";
-import type { CreateUserRequest } from "../../business/dtos/users";
+import type { CreateUserRequest } from "../../services/dtos/users";
 
 const sanitizePhone = (value: string | null | undefined): string | null => {
   if (!value) return null;

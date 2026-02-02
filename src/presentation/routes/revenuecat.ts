@@ -6,7 +6,7 @@ import type { AppConfig } from "../../config/env";
 import type { ApiError } from "../http/responses";
 import { getContainer } from "../http/context";
 import { createRevenueCatWebhookAuth } from "../http/middleware";
-import type { RevenueCatWebhookPayload } from "../../business/dtos/revenuecat";
+import type { RevenueCatWebhookPayload } from "../../services/dtos/revenuecat";
 
 export const createRevenueCatRoutes = (config: AppConfig) => {
   const router = new Hono<{ Bindings: EnvBindings; Variables: AppVariables }>();

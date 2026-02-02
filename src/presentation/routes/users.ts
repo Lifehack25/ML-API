@@ -17,7 +17,7 @@ import type {
   UpdateUserNameRequest,
   VerifyCodeRequest,
   VerifyIdentifierRequest,
-} from "../../business/dtos/users";
+} from "../../services/dtos/users";
 
 const createJwtMiddleware = (config: AppConfig) =>
   jwt({

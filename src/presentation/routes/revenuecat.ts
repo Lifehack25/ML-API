@@ -1,12 +1,12 @@
-import { Hono } from "hono";
-import type { Context } from "hono";
-import type { EnvBindings } from "../../common/bindings";
-import type { AppVariables } from "../../common/context";
-import type { AppConfig } from "../../config/env";
-import type { ApiError } from "../http/responses";
-import { getContainer } from "../http/context";
-import { createRevenueCatWebhookAuth } from "../http/middleware";
-import type { RevenueCatWebhookPayload } from "../../services/dtos/revenuecat";
+import { Hono } from 'hono';
+import type { Context } from 'hono';
+import type { EnvBindings } from '../../common/bindings';
+import type { AppVariables } from '../../common/context';
+import type { AppConfig } from '../../config/env';
+import type { ApiError } from '../http/responses';
+import { getContainer } from '../http/context';
+import { createRevenueCatWebhookAuth } from '../http/middleware';
+import type { RevenueCatWebhookPayload } from '../../services/dtos/revenuecat';
 
 export const createRevenueCatRoutes = (config: AppConfig) => {
   const router = new Hono<{ Bindings: EnvBindings; Variables: AppVariables }>();
@@ -30,7 +30,7 @@ export const createRevenueCatRoutes = (config: AppConfig) => {
    * - RENEWAL, CANCELLATION, EXPIRATION, etc. (not relevant for one-time purchases)
    */
   router.post(
-    "/webhooks/revenuecat",
+    '/webhooks/revenuecat',
     webhookAuth,
     async (c: Context<{ Bindings: EnvBindings; Variables: AppVariables }>) => {
       try {
@@ -42,12 +42,12 @@ export const createRevenueCatRoutes = (config: AppConfig) => {
         try {
           payload = await c.req.json();
         } catch (error) {
-          logger.error("Failed to parse RevenueCat webhook payload", { error: String(error) });
-          return c.json({ error: "Invalid JSON payload" } as ApiError, 400);
+          logger.error('Failed to parse RevenueCat webhook payload', { error: String(error) });
+          return c.json({ error: 'Invalid JSON payload' } as ApiError, 400);
         }
 
         // Log webhook receipt
-        logger.info("RevenueCat webhook received", {
+        logger.info('RevenueCat webhook received', {
           eventType: payload.event?.type,
           eventId: payload.event?.id,
           productId: payload.event?.product_id,
@@ -70,8 +70,8 @@ export const createRevenueCatRoutes = (config: AppConfig) => {
         }
       } catch (error) {
         const logger = getContainer(c).logger;
-        logger.error("Unexpected error in RevenueCat webhook handler", { error: String(error) });
-        return c.json({ error: "Internal server error" } as ApiError, 500);
+        logger.error('Unexpected error in RevenueCat webhook handler', { error: String(error) });
+        return c.json({ error: 'Internal server error' } as ApiError, 500);
       }
     }
   );

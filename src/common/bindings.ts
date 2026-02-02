@@ -20,10 +20,6 @@ export interface EnvBindings {
   CLOUDFLARE_ACCOUNT_ID?: string;
   CLOUDFLARE_UPLOAD_TOKEN?: string;
 
-  // Cloudflare cache
-  CLOUDFLARE_ZONE_ID?: string;
-  CLOUDFLARE_PURGE_TOKEN?: string;
-
   // Firebase
   FIREBASE_SERVICE_ACCOUNT_JSON?: string;
 

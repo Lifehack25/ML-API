@@ -30,8 +30,8 @@ export async function compressImage(
     // Resize to 87% dimensions + 90% quality = ~25% file size reduction
     const transformationResult = await imagesBinding
       .input(stream)
-      .transform({ width: newWidth, height: newHeight, fit: "scale-down" })
-      .output({ format: "image/jpeg", quality });
+      .transform({ width: newWidth, height: newHeight, fit: 'scale-down' })
+      .output({ format: 'image/jpeg', quality });
 
     // Get the response from the transformation result
     const response = transformationResult.response();
@@ -46,7 +46,7 @@ export async function compressImage(
     // Convert response to Blob, then to File
     const compressedBlob = await response.blob();
     const compressedFile = new File([compressedBlob], file.name, {
-      type: "image/jpeg",
+      type: 'image/jpeg',
       lastModified: Date.now(),
     });
 

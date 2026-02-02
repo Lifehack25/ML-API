@@ -1,5 +1,5 @@
-import { CloudflareMediaConfig } from "../config/env";
-import type { Logger } from "../common/logger";
+import { CloudflareMediaConfig } from '../config/env';
+import type { Logger } from '../common/logger';
 
 export interface CloudflareUploadResult {
   success: boolean;
@@ -32,6 +32,10 @@ interface CloudflareVideoResponse {
   };
 }
 
+/**
+ * Client for Cloudflare Images and Stream.
+ * Handles uploading and deleting media assets.
+ */
 export interface CloudflareMediaClient {
   uploadImage(file: File): Promise<CloudflareUploadResult>;
   uploadVideo(file: File): Promise<CloudflareUploadResult>;
@@ -53,7 +57,7 @@ const extractAccountHash = (variant?: string | null): string | null => {
   if (!variant) return null;
   try {
     const url = new URL(variant);
-    const segments = url.pathname.split("/").filter(Boolean);
+    const segments = url.pathname.split('/').filter(Boolean);
     return segments.length > 0 ? segments[0] : null;
   } catch {
     return null;
@@ -62,23 +66,37 @@ const extractAccountHash = (variant?: string | null): string | null => {
 
 const extractImageId = (identifier: string): string | null => {
   if (!identifier) return null;
-  if (!identifier.includes("/")) {
+  if (!identifier.includes('/')) {
     return identifier;
   }
 
   try {
-    const segments = new URL(identifier).pathname.split("/").filter(Boolean);
+    const segments = new URL(identifier).pathname.split('/').filter(Boolean);
     return segments.length >= 2 ? segments[segments.length - 2] : null;
   } catch {
     return null;
   }
 };
 
-export const createCloudflareMediaClient = (config?: CloudflareMediaConfig): CloudflareMediaClient => {
+export const createCloudflareMediaClient = (
+  config?: CloudflareMediaConfig
+): CloudflareMediaClient => {
   if (!config) {
     return {
-      uploadImage: async () => ({ success: false, cloudflareId: null, url: null, thumbnailUrl: null, error: "Cloudflare media not configured" }),
-      uploadVideo: async () => ({ success: false, cloudflareId: null, url: null, thumbnailUrl: null, error: "Cloudflare media not configured" }),
+      uploadImage: async () => ({
+        success: false,
+        cloudflareId: null,
+        url: null,
+        thumbnailUrl: null,
+        error: 'Cloudflare media not configured',
+      }),
+      uploadVideo: async () => ({
+        success: false,
+        cloudflareId: null,
+        url: null,
+        thumbnailUrl: null,
+        error: 'Cloudflare media not configured',
+      }),
       deleteImage: async () => false,
       deleteVideo: async () => false,
     };
@@ -86,10 +104,10 @@ export const createCloudflareMediaClient = (config?: CloudflareMediaConfig): Clo
 
   const uploadImage = async (file: File): Promise<CloudflareUploadResult> => {
     const form = new FormData();
-    form.append("file", file, file.name || "image.jpg");
+    form.append('file', file, file.name || 'image.jpg');
 
     const response = await fetch(IMAGES_ENDPOINT(config), {
-      method: "POST",
+      method: 'POST',
       headers: authHeaders(config),
       body: form,
     });
@@ -97,8 +115,8 @@ export const createCloudflareMediaClient = (config?: CloudflareMediaConfig): Clo
     const payload = await response.json<CloudflareImageResponse>().catch(() => null);
 
     if (!response.ok || !payload?.success || !payload?.result?.id) {
-      const errorMessage = payload?.errors?.[0]?.message || response.statusText || "Upload failed";
-      console.error("Cloudflare image upload failed", errorMessage);
+      const errorMessage = payload?.errors?.[0]?.message || response.statusText || 'Upload failed';
+      console.error('Cloudflare image upload failed', errorMessage);
       return {
         success: false,
         cloudflareId: null,
@@ -109,7 +127,7 @@ export const createCloudflareMediaClient = (config?: CloudflareMediaConfig): Clo
     }
 
     const imageId: string = payload.result.id;
-    const accountHash = extractAccountHash(payload.result.variants?.[0]) ?? "";
+    const accountHash = extractAccountHash(payload.result.variants?.[0]) ?? '';
     const baseUrl = accountHash ? `https://imagedelivery.net/${accountHash}/${imageId}` : null;
 
     return {
@@ -122,10 +140,10 @@ export const createCloudflareMediaClient = (config?: CloudflareMediaConfig): Clo
 
   const uploadVideo = async (file: File): Promise<CloudflareUploadResult> => {
     const form = new FormData();
-    form.append("file", file, file.name || "video.mp4");
+    form.append('file', file, file.name || 'video.mp4');
 
     const response = await fetch(STREAM_ENDPOINT(config), {
-      method: "POST",
+      method: 'POST',
       headers: authHeaders(config),
       body: form,
     });
@@ -133,8 +151,8 @@ export const createCloudflareMediaClient = (config?: CloudflareMediaConfig): Clo
     const payload = await response.json<CloudflareVideoResponse>().catch(() => null);
 
     if (!response.ok || !payload?.success || !payload?.result?.uid) {
-      const errorMessage = payload?.errors?.[0]?.message || response.statusText || "Upload failed";
-      console.error("Cloudflare video upload failed", errorMessage);
+      const errorMessage = payload?.errors?.[0]?.message || response.statusText || 'Upload failed';
+      console.error('Cloudflare video upload failed', errorMessage);
       return {
         success: false,
         cloudflareId: null,
@@ -145,9 +163,10 @@ export const createCloudflareMediaClient = (config?: CloudflareMediaConfig): Clo
     }
 
     const uid: string = payload.result.uid;
-    const duration = typeof payload.result.duration === "number" && payload.result.duration > 0
-      ? Math.round(payload.result.duration)
-      : null;
+    const duration =
+      typeof payload.result.duration === 'number' && payload.result.duration > 0
+        ? Math.round(payload.result.duration)
+        : null;
 
     return {
       success: true,
@@ -165,12 +184,12 @@ export const createCloudflareMediaClient = (config?: CloudflareMediaConfig): Clo
     }
 
     const response = await fetch(`${IMAGES_ENDPOINT(config)}/${imageId}`, {
-      method: "DELETE",
+      method: 'DELETE',
       headers: authHeaders(config),
     });
 
     if (!response.ok) {
-      console.error("Cloudflare image delete failed", response.status, response.statusText);
+      console.error('Cloudflare image delete failed', response.status, response.statusText);
     }
 
     return response.ok;
@@ -178,12 +197,12 @@ export const createCloudflareMediaClient = (config?: CloudflareMediaConfig): Clo
 
   const deleteVideo = async (uid: string): Promise<boolean> => {
     const response = await fetch(`${STREAM_ENDPOINT(config)}/${uid}`, {
-      method: "DELETE",
+      method: 'DELETE',
       headers: authHeaders(config),
     });
 
     if (!response.ok) {
-      console.error("Cloudflare video delete failed", response.status, response.statusText);
+      console.error('Cloudflare video delete failed', response.status, response.statusText);
     }
 
     return response.ok;

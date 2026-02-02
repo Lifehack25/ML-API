@@ -1,10 +1,10 @@
-import { eq, and, or, lte, inArray, desc, asc, sql } from "drizzle-orm";
-import type { DrizzleClient } from "../db";
-import { cleanupJobs, type CleanupJob } from "../schema";
+import { eq, and, or, lte, inArray, desc, asc, sql } from 'drizzle-orm';
+import type { DrizzleClient } from '../db';
+import { cleanupJobs, type CleanupJob } from '../schema';
 
 export interface CreateCleanupJobRequest {
   cloudflare_id: string;
-  media_type: "image" | "video";
+  media_type: 'image' | 'video';
 }
 
 export class CleanupJobRepository {
@@ -32,20 +32,20 @@ export class CleanupJobRepository {
           media_type: request.media_type,
           retry_count: 0,
           next_retry_at: nextRetryAt,
-          status: "pending",
+          status: 'pending',
           created_at: now,
           updated_at: now,
         })
         .returning();
 
       if (!result[0]) {
-        throw new Error("Failed to create cleanup job");
+        throw new Error('Failed to create cleanup job');
       }
 
       return result[0];
     } catch (error) {
       // If unique constraint violation, fetch and return existing job
-      if (error instanceof Error && error.message.includes("UNIQUE constraint failed")) {
+      if (error instanceof Error && error.message.includes('UNIQUE constraint failed')) {
         const existing = await this.findByCloudflareId(request.cloudflare_id);
         if (existing) {
           return existing;
@@ -56,11 +56,7 @@ export class CleanupJobRepository {
   }
 
   async findById(id: number): Promise<CleanupJob | null> {
-    const result = await this.db
-      .select()
-      .from(cleanupJobs)
-      .where(eq(cleanupJobs.id, id))
-      .limit(1);
+    const result = await this.db.select().from(cleanupJobs).where(eq(cleanupJobs.id, id)).limit(1);
 
     return result[0] ?? null;
   }
@@ -87,7 +83,7 @@ export class CleanupJobRepository {
       .from(cleanupJobs)
       .where(
         and(
-          eq(cleanupJobs.status, "pending"),
+          eq(cleanupJobs.status, 'pending'),
           or(sql`${cleanupJobs.next_retry_at} IS NULL`, lte(cleanupJobs.next_retry_at, now))
         )
       )
@@ -102,7 +98,7 @@ export class CleanupJobRepository {
     const now = new Date().toISOString();
     await this.db
       .update(cleanupJobs)
-      .set({ status: "completed", updated_at: now })
+      .set({ status: 'completed', updated_at: now })
       .where(eq(cleanupJobs.id, id));
   }
 
@@ -116,7 +112,7 @@ export class CleanupJobRepository {
     // Get current retry count
     const job = await this.findById(id);
     if (!job) {
-      throw new Error("Cleanup job not found");
+      throw new Error('Cleanup job not found');
     }
 
     const newRetryCount = job.retry_count + 1;
@@ -131,7 +127,7 @@ export class CleanupJobRepository {
       await this.db
         .update(cleanupJobs)
         .set({
-          status: "failed",
+          status: 'failed',
           retry_count: newRetryCount,
           last_error: error,
           updated_at: now,
@@ -169,7 +165,9 @@ export class CleanupJobRepository {
         pending_count: sql<number>`SUM(CASE WHEN ${cleanupJobs.status} = 'pending' THEN 1 ELSE 0 END)`,
         completed_count: sql<number>`SUM(CASE WHEN ${cleanupJobs.status} = 'completed' THEN 1 ELSE 0 END)`,
         failed_count: sql<number>`SUM(CASE WHEN ${cleanupJobs.status} = 'failed' THEN 1 ELSE 0 END)`,
-        oldest_pending: sql<string | null>`MIN(CASE WHEN ${cleanupJobs.status} = 'pending' THEN ${cleanupJobs.created_at} ELSE NULL END)`,
+        oldest_pending: sql<
+          string | null
+        >`MIN(CASE WHEN ${cleanupJobs.status} = 'pending' THEN ${cleanupJobs.created_at} ELSE NULL END)`,
       })
       .from(cleanupJobs);
 
@@ -192,12 +190,14 @@ export class CleanupJobRepository {
     const result = await this.db
       .delete(cleanupJobs)
       .where(
-        and(inArray(cleanupJobs.status, ["completed", "failed"]), sql`${cleanupJobs.created_at} < ${cutoff}`)
+        and(
+          inArray(cleanupJobs.status, ['completed', 'failed']),
+          sql`${cleanupJobs.created_at} < ${cutoff}`
+        )
       );
 
     // Drizzle doesn't return changes count directly, so we'll return 0
     // In production, you might want to query count before deleting if needed
     return 0;
   }
-
 }

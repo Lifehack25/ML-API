@@ -13,4 +13,3 @@ export interface AlbumResponse {
   SealDate: string | null;
   Media: AlbumMedia[];
 }
-

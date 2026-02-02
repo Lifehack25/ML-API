@@ -1,5 +1,5 @@
-import { createRemoteJWKSet, jwtVerify, JWTPayload } from "jose";
-import { AppleConfig } from "../../config/env";
+import { createRemoteJWKSet, jwtVerify, JWTPayload } from 'jose';
+import { AppleConfig } from '../../config/env';
 
 export interface AppleUserInfo {
   appleUserId: string;
@@ -12,13 +12,13 @@ export interface AppleVerifier {
   verifyIdToken(idToken: string): Promise<AppleUserInfo>;
 }
 
-const APPLE_ISSUER = "https://appleid.apple.com";
-const jwks = createRemoteJWKSet(new URL("https://appleid.apple.com/auth/keys"));
+const APPLE_ISSUER = 'https://appleid.apple.com';
+const jwks = createRemoteJWKSet(new URL('https://appleid.apple.com/auth/keys'));
 
 const parseBooleanClaim = (value: unknown): boolean => {
-  if (typeof value === "boolean") return value;
-  if (typeof value === "string") {
-    return value.toLowerCase() === "true" || value === "1";
+  if (typeof value === 'boolean') return value;
+  if (typeof value === 'string') {
+    return value.toLowerCase() === 'true' || value === '1';
   }
   return false;
 };
@@ -27,7 +27,7 @@ export const createAppleVerifier = (config?: AppleConfig): AppleVerifier => {
   if (!config) {
     return {
       async verifyIdToken() {
-        throw new Error("Apple Sign-In is not configured");
+        throw new Error('Apple Sign-In is not configured');
       },
     };
   }
@@ -40,19 +40,19 @@ export const createAppleVerifier = (config?: AppleConfig): AppleVerifier => {
       });
 
       if (!payload.sub) {
-        throw new Error("Apple token missing subject");
+        throw new Error('Apple token missing subject');
       }
 
       const extractName = (claims: JWTPayload): string | undefined => {
-        if (typeof claims.name === "string" && claims.name.trim().length > 0) {
+        if (typeof claims.name === 'string' && claims.name.trim().length > 0) {
           return claims.name.trim();
         }
 
-        const givenName = typeof claims.given_name === "string" ? claims.given_name : undefined;
-        const familyName = typeof claims.family_name === "string" ? claims.family_name : undefined;
+        const givenName = typeof claims.given_name === 'string' ? claims.given_name : undefined;
+        const familyName = typeof claims.family_name === 'string' ? claims.family_name : undefined;
 
         if (givenName || familyName) {
-          return `${givenName ?? ""} ${familyName ?? ""}`.trim();
+          return `${givenName ?? ''} ${familyName ?? ''}`.trim();
         }
 
         return undefined;
@@ -60,11 +60,10 @@ export const createAppleVerifier = (config?: AppleConfig): AppleVerifier => {
 
       return {
         appleUserId: payload.sub,
-        email: typeof payload.email === "string" ? payload.email : undefined,
+        email: typeof payload.email === 'string' ? payload.email : undefined,
         emailVerified: parseBooleanClaim(payload.email_verified),
         name: extractName(payload),
       } satisfies AppleUserInfo;
     },
   };
 };
-

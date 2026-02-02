@@ -12,4 +12,3 @@ export interface MilestoneNotificationRequest {
   scanCount: number;
   milestone: number;
 }
-

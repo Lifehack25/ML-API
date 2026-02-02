@@ -1,6 +1,6 @@
-import { eq, desc, sql } from "drizzle-orm";
-import type { DrizzleClient } from "../db";
-import { locks, type Lock } from "../schema";
+import { eq, desc, sql } from 'drizzle-orm';
+import type { DrizzleClient } from '../db';
+import { locks, type Lock } from '../schema';
 
 export interface LockCreateRequest {
   lock_name?: string;
@@ -18,6 +18,10 @@ export interface LockUpdateRequest {
   geo_location?: string | null;
 }
 
+/**
+ * Repository for managing Lock entities.
+ * Handles database operations for albums/locks including creation, updates, and scan counting.
+ */
 export class LockRepository {
   constructor(private readonly db: DrizzleClient) {}
 
@@ -60,8 +64,8 @@ export class LockRepository {
   async create(data: LockCreateRequest): Promise<Lock> {
     const now = new Date().toISOString();
     const payload = {
-      lock_name: data.lock_name ?? "Memory Lock",
-      album_title: data.album_title ?? "Wonderful Memories",
+      lock_name: data.lock_name ?? 'Memory Lock',
+      album_title: data.album_title ?? 'Wonderful Memories',
       seal_date: data.seal_date ?? null,
       scan_count: 0,
       created_at: now,
@@ -73,7 +77,7 @@ export class LockRepository {
     const result = await this.db.insert(locks).values(payload).returning();
 
     if (!result[0]) {
-      throw new Error("Failed to create lock");
+      throw new Error('Failed to create lock');
     }
 
     return result[0];
@@ -107,13 +111,13 @@ export class LockRepository {
     }
 
     if (Object.keys(updates).length === 0) {
-      throw new Error("No fields provided for lock update");
+      throw new Error('No fields provided for lock update');
     }
 
     const result = await this.db.update(locks).set(updates).where(eq(locks.id, id)).returning();
 
     if (!result[0]) {
-      throw new Error("Failed to update lock");
+      throw new Error('Failed to update lock');
     }
 
     return result[0];
@@ -136,7 +140,7 @@ export class LockRepository {
       .returning();
 
     if (!result[0]) {
-      throw new Error("Lock not found or failed to increment scan count");
+      throw new Error('Lock not found or failed to increment scan count');
     }
 
     const updatedLock = result[0];
@@ -157,7 +161,7 @@ export class LockRepository {
         .returning();
 
       if (!finalResult[0]) {
-        throw new Error("Lock not found after milestone update");
+        throw new Error('Lock not found after milestone update');
       }
       return { lock: finalResult[0], milestoneReached };
     }

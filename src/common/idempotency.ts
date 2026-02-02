@@ -67,12 +67,12 @@ export async function withIdempotency<T>(
   const idempotencyKey = `idempotency:${key}`;
 
   // Check if operation already exists
-  const existing = await kv.get(idempotencyKey, "json");
+  const existing = await kv.get(idempotencyKey, 'json');
   if (existing !== null) {
     // If operation completed successfully, return cached result
-    if (typeof existing === "object" && existing !== null && "status" in existing) {
+    if (typeof existing === 'object' && existing !== null && 'status' in existing) {
       const cached = existing as { status: string; result?: T };
-      if (cached.status === "completed" && cached.result !== undefined) {
+      if (cached.status === 'completed' && cached.result !== undefined) {
         return { isDuplicate: true, result: cached.result };
       }
     }
@@ -82,11 +82,9 @@ export async function withIdempotency<T>(
   }
 
   // Mark operation as processing
-  await kv.put(
-    idempotencyKey,
-    JSON.stringify({ status: "processing", timestamp: Date.now() }),
-    { expirationTtl: ttlSeconds }
-  );
+  await kv.put(idempotencyKey, JSON.stringify({ status: 'processing', timestamp: Date.now() }), {
+    expirationTtl: ttlSeconds,
+  });
 
   try {
     // Execute the operation
@@ -95,7 +93,7 @@ export async function withIdempotency<T>(
     // Store successful result with longer TTL
     await kv.put(
       idempotencyKey,
-      JSON.stringify({ status: "completed", result, timestamp: Date.now() }),
+      JSON.stringify({ status: 'completed', result, timestamp: Date.now() }),
       { expirationTtl: successTtlSeconds }
     );
 
@@ -139,11 +137,11 @@ export async function withIdempotencyCheck<T>(
   // Check if operation already in progress
   const existing = await kv.get(idempotencyKey);
   if (existing !== null) {
-    throw new Error("Duplicate request detected - operation already in progress");
+    throw new Error('Duplicate request detected - operation already in progress');
   }
 
   // Mark operation as in progress
-  await kv.put(idempotencyKey, "processing", { expirationTtl: ttlSeconds });
+  await kv.put(idempotencyKey, 'processing', { expirationTtl: ttlSeconds });
 
   try {
     // Execute the operation

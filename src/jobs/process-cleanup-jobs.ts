@@ -1,16 +1,16 @@
-import type { EnvBindings } from "../common/bindings";
-import { CleanupJobRepository } from "../data/repositories/cleanup-job-repository";
-import { createCloudflareMediaClient } from "../infrastructure/cloudflare";
-import { loadConfig } from "../config/env";
-import { createLogger } from "../common/logger";
-import { createDrizzleClient } from "../data/db";
+import type { EnvBindings } from '../common/bindings';
+import { CleanupJobRepository } from '../data/repositories/cleanup-job-repository';
+import { createCloudflareMediaClient } from '../infrastructure/cloudflare-media';
+import { loadConfig } from '../config/env';
+import { createLogger } from '../common/logger';
+import { createDrizzleClient } from '../data/db';
 
 /**
  * Processes pending Cloudflare cleanup jobs with exponential backoff retry logic.
- * Runs every 15 minutes via cron trigger.
+ * Runs every 12 hours via cron trigger.
  */
 export async function processCleanupJobs(env: EnvBindings, ctx: ExecutionContext): Promise<void> {
-  const logger = createLogger("cleanup-jobs");
+  const logger = createLogger('cleanup-jobs');
   const config = loadConfig(env);
   const db = createDrizzleClient(env.DB);
   const cleanupJobRepo = new CleanupJobRepository(db);
@@ -28,11 +28,13 @@ export async function processCleanupJobs(env: EnvBindings, ctx: ExecutionContext
     // Process each job
     for (const job of jobs) {
       try {
-        logger.info(`Attempting to clean up ${job.media_type} ${job.cloudflare_id} (attempt ${job.retry_count + 1})`);
+        logger.info(
+          `Attempting to clean up ${job.media_type} ${job.cloudflare_id} (attempt ${job.retry_count + 1})`
+        );
 
         // Attempt Cloudflare deletion
         const success =
-          job.media_type === "image"
+          job.media_type === 'image'
             ? await cloudflareClient.deleteImage(job.cloudflare_id)
             : await cloudflareClient.deleteVideo(job.cloudflare_id);
 
@@ -40,7 +42,7 @@ export async function processCleanupJobs(env: EnvBindings, ctx: ExecutionContext
           await cleanupJobRepo.markCompleted(job.id);
           logger.info(`Successfully cleaned up ${job.media_type} ${job.cloudflare_id}`);
         } else {
-          const errorMsg = "Cloudflare API returned false";
+          const errorMsg = 'Cloudflare API returned false';
           await cleanupJobRepo.markFailedAndScheduleRetry(job.id, errorMsg);
           logger.warn(`Failed to clean up ${job.media_type} ${job.cloudflare_id}: ${errorMsg}`);
         }
@@ -55,14 +57,14 @@ export async function processCleanupJobs(env: EnvBindings, ctx: ExecutionContext
 
     // Log stats after processing
     const stats = await cleanupJobRepo.getStats();
-    logger.info("Cleanup job stats", {
+    logger.info('Cleanup job stats', {
       pending: stats.pendingCount,
       completed: stats.completedCount,
       failed: stats.failedCount,
       oldestPending: stats.oldestPending,
     });
   } catch (error) {
-    logger.error("Fatal error in cleanup job processor", { error: String(error) });
+    logger.error('Fatal error in cleanup job processor', { error: String(error) });
     throw error; // Re-throw to mark cron execution as failed
   }
 }

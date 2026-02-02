@@ -1,9 +1,9 @@
-import type { MediaObject } from "../schema";
-import type { CreatedMedia } from "../../services/dtos/locks";
-import type { AlbumMedia } from "../../services/dtos/albums";
+import type { MediaObject } from '../schema';
+import type { CreatedMedia } from '../../services/dtos/locks';
+import type { AlbumMedia } from '../../services/dtos/albums';
 
 const bool = (value: number | boolean): boolean =>
-  typeof value === "boolean" ? value : value !== 0;
+  typeof value === 'boolean' ? value : value !== 0;
 
 export const mapMediaRowToAlbum = (row: MediaObject): AlbumMedia => ({
   Id: row.id,

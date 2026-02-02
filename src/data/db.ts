@@ -1,6 +1,6 @@
-import { drizzle } from "drizzle-orm/d1";
-import type { D1Database } from "@cloudflare/workers-types";
-import * as schema from "./schema";
+import { drizzle } from 'drizzle-orm/d1';
+import type { D1Database } from '@cloudflare/workers-types';
+import * as schema from './schema';
 
 /**
  * Creates a Drizzle database client instance from a D1Database binding

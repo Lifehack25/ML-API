@@ -1,9 +1,9 @@
-import { Logger } from "../../common/logger";
-import { failure, ServiceResult, success } from "../../common/result";
-import type { HashIdHelper } from "../../common/hashids";
-import { LockRepository } from "../../data/repositories/lock-repository";
-import { MediaObjectRepository } from "../../data/repositories/media-object-repository";
-import { mapLockRowToSummary } from "../../data/mappers/lock-mapper";
+import { Logger } from '../common/logger';
+import { failure, ServiceResult, success } from '../common/result';
+import type { HashIdHelper } from '../common/hashids';
+import { LockRepository } from '../data/repositories/lock-repository';
+import { MediaObjectRepository } from '../data/repositories/media-object-repository';
+import { mapLockRowToSummary } from '../data/mappers/lock-mapper';
 import {
   LockSummary,
   PublishMetadataRequest,
@@ -11,11 +11,17 @@ import {
   UpdateLockNameRequest,
   UploadMediaPayload,
   ValidationData,
-} from "../dtos/locks";
-import { ManageMediaService } from "./manage-media-service";
+} from './dtos/locks';
+import { ManageMediaService } from './manage-media-service';
 
-const formatDateOnly = (date: Date) => date.toISOString().split("T")[0];
+import { UNSEAL_PRODUCT_ID, STORAGE_UPGRADE_PRODUCT_ID } from './dtos/revenuecat';
 
+const formatDateOnly = (date: Date) => date.toISOString().split('T')[0];
+
+/**
+ * Core domain service for Lock/Album management.
+ * Handles high-level lock operations and delegates media operations to ManageMediaService.
+ */
 export class LockService {
   constructor(
     private readonly lockRepository: LockRepository,
@@ -27,45 +33,52 @@ export class LockService {
 
   async getUserLocks(userId: number): Promise<ServiceResult<LockSummary[]>> {
     const locks = await this.lockRepository.findByUserId(userId);
-    const summaries = locks.map(lock => mapLockRowToSummary(lock, this.hashids));
+    const summaries = locks.map((lock) => mapLockRowToSummary(lock, this.hashids));
     return success(summaries, `Retrieved ${summaries.length} locks`);
   }
 
-  async connectLockToUser(userId: number, hashedLockId: string): Promise<ServiceResult<LockSummary>> {
+  /**
+   * Links a lock to a user account using a hashed lock ID.
+   * Typical flow: User scans a QR code (hashed ID), and this method claims it.
+   */
+  async connectLockToUser(
+    userId: number,
+    hashedLockId: string
+  ): Promise<ServiceResult<LockSummary>> {
     if (!hashedLockId?.trim()) {
-      return failure("INVALID_REQUEST", "hashedLockId is required", undefined, 400);
+      return failure('INVALID_REQUEST', 'hashedLockId is required', undefined, 400);
     }
 
     const lockId = this.hashids.decode(hashedLockId);
     if (!lockId) {
-      return failure("INVALID_HASH", "Invalid hashed lock ID", undefined, 400);
+      return failure('INVALID_HASH', 'Invalid hashed lock ID', undefined, 400);
     }
 
     const lock = await this.lockRepository.findById(lockId);
     if (!lock) {
-      return failure("LOCK_NOT_FOUND", "Lock not found", undefined, 404);
+      return failure('LOCK_NOT_FOUND', 'Lock not found', undefined, 404);
     }
 
     const updated = await this.lockRepository.update(lockId, { user_id: userId });
-    return success(mapLockRowToSummary(updated, this.hashids), "Lock connected successfully");
+    return success(mapLockRowToSummary(updated, this.hashids), 'Lock connected successfully');
   }
 
   async updateLockName(request: UpdateLockNameRequest): Promise<ServiceResult<LockSummary>> {
     if (!request.lockId || !request.newName?.trim()) {
-      return failure("INVALID_REQUEST", "lockId and newName are required", undefined, 400);
+      return failure('INVALID_REQUEST', 'lockId and newName are required', undefined, 400);
     }
 
     const updated = await this.lockRepository.update(request.lockId, {
       lock_name: request.newName.trim(),
     });
 
-    return success(mapLockRowToSummary(updated, this.hashids), "Lock name updated successfully");
+    return success(mapLockRowToSummary(updated, this.hashids), 'Lock name updated successfully');
   }
 
   async toggleSealDate(lockId: number): Promise<ServiceResult<LockSummary>> {
     const existing = await this.lockRepository.findById(lockId);
     if (!existing) {
-      return failure("LOCK_NOT_FOUND", "Lock not found", undefined, 404);
+      return failure('LOCK_NOT_FOUND', 'Lock not found', undefined, 404);
     }
 
     const isSealed = Boolean(existing.seal_date);
@@ -75,7 +88,7 @@ export class LockService {
 
     return success(
       mapLockRowToSummary(updated, this.hashids),
-      isSealed ? "Lock unsealed successfully" : "Lock sealed successfully"
+      isSealed ? 'Lock unsealed successfully' : 'Lock sealed successfully'
     );
   }
 
@@ -85,7 +98,7 @@ export class LockService {
   ): Promise<ServiceResult<LockSummary>> {
     const existing = await this.lockRepository.findById(lockId);
     if (!existing) {
-      return failure("LOCK_NOT_FOUND", "Lock not found", undefined, 404);
+      return failure('LOCK_NOT_FOUND', 'Lock not found', undefined, 404);
     }
 
     const geoLocationJson = JSON.stringify(geoLocation);
@@ -95,8 +108,8 @@ export class LockService {
     });
 
     const message = existing.geo_location
-      ? "Geo location updated successfully"
-      : "Geo location set successfully";
+      ? 'Geo location updated successfully'
+      : 'Geo location set successfully';
 
     return success(mapLockRowToSummary(updated, this.hashids), message);
   }
@@ -104,15 +117,15 @@ export class LockService {
   async upgradeStorage(lockId: number): Promise<ServiceResult<LockSummary>> {
     const existing = await this.lockRepository.findById(lockId);
     if (!existing) {
-      return failure("LOCK_NOT_FOUND", "Lock not found", undefined, 404);
+      return failure('LOCK_NOT_FOUND', 'Lock not found', undefined, 404);
     }
 
     if (Boolean(existing.upgraded_storage)) {
-      return success(mapLockRowToSummary(existing, this.hashids), "Storage already upgraded");
+      return success(mapLockRowToSummary(existing, this.hashids), 'Storage already upgraded');
     }
 
     const updated = await this.lockRepository.update(lockId, { upgraded_storage: true });
-    return success(mapLockRowToSummary(updated, this.hashids), "Storage upgraded successfully");
+    return success(mapLockRowToSummary(updated, this.hashids), 'Storage upgraded successfully');
   }
 
   async publishMetadata(request: PublishMetadataRequest): Promise<ServiceResult<PublishResult>> {
@@ -137,7 +150,7 @@ export class LockService {
 
   async updateAlbumTitle(lockId: number, albumTitle: string): Promise<ServiceResult<LockSummary>> {
     const updated = await this.lockRepository.update(lockId, { album_title: albumTitle });
-    return success(mapLockRowToSummary(updated, this.hashids), "Album title updated");
-  }
 
+    return success(mapLockRowToSummary(updated, this.hashids), 'Album title updated');
+  }
 }

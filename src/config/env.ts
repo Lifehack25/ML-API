@@ -1,4 +1,4 @@
-import { EnvBindings } from "../common/bindings";
+import { EnvBindings } from '../common/bindings';
 
 export interface JwtConfig {
   secret: string;
@@ -29,11 +29,6 @@ export interface CloudflareMediaConfig {
   uploadToken: string;
 }
 
-export interface CloudflareCacheConfig {
-  zoneId: string;
-  purgeToken: string;
-}
-
 export interface FirebaseConfig {
   serviceAccountJson?: string;
 }
@@ -62,13 +57,16 @@ export interface StorageLimits {
   maxVideoSizeMB: number;
 }
 
+/**
+ * Main application configuration object.
+ * Loaded from environment variables (bindings) at runtime.
+ */
 export interface AppConfig {
   jwt: JwtConfig;
   hashids: HashIdsConfig;
   twilio?: TwilioConfig;
   sightengine?: SightengineConfig;
   cloudflareMedia?: CloudflareMediaConfig;
-  cloudflareCache?: CloudflareCacheConfig;
   firebase?: FirebaseConfig;
   apple?: AppleConfig;
   google: GoogleConfig;
@@ -79,44 +77,46 @@ export interface AppConfig {
   storageLimits: StorageLimits;
 }
 
-const parseNumber = (value: string | undefined, fallback: number): number => {
-  if (!value) return fallback;
-  const parsed = Number(value);
-  return Number.isFinite(parsed) ? parsed : fallback;
-};
-
 export const loadConfig = (env: EnvBindings): AppConfig => {
   if (!env.JWT_SECRET) {
-    throw new Error("JWT_SECRET is required");
+    throw new Error('JWT_SECRET is required');
   }
 
   const createLockApiKey = env.CREATE_LOCK_API_KEY?.trim();
   if (!createLockApiKey) {
-    throw new Error("CREATE_LOCK_API_KEY is required");
+    throw new Error('CREATE_LOCK_API_KEY is required');
   }
 
   const pushNotificationKey = env.PUSH_NOTIFICATION_KEY?.trim();
   if (!pushNotificationKey) {
-    throw new Error("PUSH_NOTIFICATION_KEY is required");
+    throw new Error('PUSH_NOTIFICATION_KEY is required');
   }
 
   const hashSalt = env.HASHIDS_SALT;
   if (!hashSalt) {
-    throw new Error("HASHIDS_SALT is required");
+    throw new Error('HASHIDS_SALT is required');
   }
 
-  const twilioConfigured = !!(env.TWILIO_ACCOUNT_SID && env.TWILIO_AUTH_TOKEN && env.TWILIO_VERIFY_SERVICE_SID);
+  const twilioConfigured = !!(
+    env.TWILIO_ACCOUNT_SID &&
+    env.TWILIO_AUTH_TOKEN &&
+    env.TWILIO_VERIFY_SERVICE_SID
+  );
   const sightengineConfigured = !!(env.SIGHTENGINE_USER && env.SIGHTENGINE_SECRET);
   const cloudflareConfigured = !!(env.CLOUDFLARE_ACCOUNT_ID && env.CLOUDFLARE_UPLOAD_TOKEN);
-  const cloudflareCacheConfigured = !!(env.CLOUDFLARE_ZONE_ID && env.CLOUDFLARE_PURGE_TOKEN);
-  const appleConfigured = !!(env.APPLE_BUNDLE_ID && env.APPLE_TEAM_ID && env.APPLE_KEY_ID && env.APPLE_AUTH_KEY_PEM);
+  const appleConfigured = !!(
+    env.APPLE_BUNDLE_ID &&
+    env.APPLE_TEAM_ID &&
+    env.APPLE_KEY_ID &&
+    env.APPLE_AUTH_KEY_PEM
+  );
   const revenueCatConfigured = !!env.REVENUECAT_WEBHOOK_AUTH_KEY;
 
   return {
     jwt: {
       secret: env.JWT_SECRET,
-      issuer: "ML-API",
-      audience: "ML-MobileApp",
+      issuer: 'ML-API',
+      audience: 'ML-MobileApp',
       accessTokenExpiryHours: 24,
       refreshTokenExpiryDays: 30,
     },
@@ -141,12 +141,6 @@ export const loadConfig = (env: EnvBindings): AppConfig => {
       ? {
           accountId: env.CLOUDFLARE_ACCOUNT_ID!,
           uploadToken: env.CLOUDFLARE_UPLOAD_TOKEN!,
-        }
-      : undefined,
-    cloudflareCache: cloudflareCacheConfigured
-      ? {
-          zoneId: env.CLOUDFLARE_ZONE_ID!,
-          purgeToken: env.CLOUDFLARE_PURGE_TOKEN!,
         }
       : undefined,
     firebase: {
@@ -178,6 +172,6 @@ export const loadConfig = (env: EnvBindings): AppConfig => {
     },
     createLockApiKey,
     pushNotificationKey,
-    environment: env.ENVIRONMENT || "development",
+    environment: env.ENVIRONMENT || 'development',
   };
 };

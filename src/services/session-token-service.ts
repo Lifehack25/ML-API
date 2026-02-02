@@ -1,7 +1,7 @@
-import { JwtService } from "../../infrastructure/Auth/jwt";
-import { UserRepository } from "../../data/repositories/user-repository";
-import { Logger } from "../../common/logger";
-import { JwtTokens } from "../dtos/users";
+import { JwtService } from '../infrastructure/Auth/jwt';
+import { UserRepository } from '../data/repositories/user-repository';
+import { Logger } from '../common/logger';
+import { JwtTokens } from './dtos/users';
 
 interface IssueTokenOptions {
   emailVerified?: boolean | null;
@@ -24,7 +24,7 @@ export class SessionTokenService {
         lastLoginAt: new Date().toISOString(),
       });
     } catch (error) {
-      this.logger.warn("Failed to update auth metadata", { userId, error: String(error) });
+      this.logger.warn('Failed to update auth metadata', { userId, error: String(error) });
     }
 
     const [accessToken, refreshToken] = await Promise.all([
@@ -32,7 +32,7 @@ export class SessionTokenService {
       this.jwtService.generateRefreshToken(userId),
     ]);
 
-    this.logger.info("Issued JWT tokens", { userId, context: options.context });
+    this.logger.info('Issued JWT tokens', { userId, context: options.context });
 
     return {
       accessToken,

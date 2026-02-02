@@ -1,9 +1,9 @@
-import type { Lock } from "../schema";
-import type { LockSummary, DateOnlyString } from "../../services/dtos/locks";
-import type { HashIdHelper } from "../../common/hashids";
+import type { Lock } from '../schema';
+import type { LockSummary, DateOnlyString } from '../../services/dtos/locks';
+import type { HashIdHelper } from '../../common/hashids';
 
 const bool = (value: number | boolean): boolean =>
-  typeof value === "boolean" ? value : value !== 0;
+  typeof value === 'boolean' ? value : value !== 0;
 
 const parseGeoLocation = (geoLocationText: string | null): { lat: number; lng: number } | null => {
   if (!geoLocationText) return null;

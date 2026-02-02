@@ -1,21 +1,21 @@
-import { Hono } from "hono";
-import { cors } from "hono/cors";
-import { secureHeaders } from "hono/secure-headers";
-import type { EnvBindings } from "./common/bindings";
-import type { AppVariables } from "./common/context";
-import { createRequestContext, type ServiceContainer } from "./common/context";
-import { loadConfig, type AppConfig } from "./config/env";
-import { requestLogger } from "./presentation/http/middleware";
-import { handleError } from "./presentation/http/errors";
-import { createSystemRoutes } from "./presentation/routes/system";
-import { createUserRoutes } from "./presentation/routes/users";
-import { createLockRoutes } from "./presentation/routes/locks";
-import { createMediaObjectRoutes } from "./presentation/routes/mediaObjects";
-import { createAlbumRoutes } from "./presentation/routes/albums";
-import { createWebAlbumRoutes } from "./presentation/routes/web-album";
-import { createPushNotificationRoutes } from "./presentation/routes/pushNotifications";
-import { createRevenueCatRoutes } from "./presentation/routes/revenuecat";
-import { processCleanupJobs } from "./jobs/process-cleanup-jobs";
+import { Hono } from 'hono';
+import { cors } from 'hono/cors';
+import { secureHeaders } from 'hono/secure-headers';
+import type { EnvBindings } from './common/bindings';
+import type { AppVariables } from './common/context';
+import { createRequestContext, type ServiceContainer } from './common/context';
+import { loadConfig, type AppConfig } from './config/env';
+import { requestLogger } from './presentation/http/middleware';
+import { handleError } from './presentation/http/errors';
+import { createSystemRoutes } from './presentation/routes/system';
+import { createUserRoutes } from './presentation/routes/users';
+import { createLockRoutes } from './presentation/routes/locks';
+import { createMediaObjectRoutes } from './presentation/routes/mediaObjects';
+import { createAlbumRoutes } from './presentation/routes/albums';
+import { createWebAlbumRoutes } from './presentation/routes/web-album';
+import { createPushNotificationRoutes } from './presentation/routes/pushNotifications';
+import { createRevenueCatRoutes } from './presentation/routes/revenuecat';
+import { processCleanupJobs } from './jobs/process-cleanup-jobs';
 
 let appInstance: Hono<{ Bindings: EnvBindings; Variables: AppVariables }> | null = null;
 let cachedConfig: AppConfig | null = null;
@@ -23,56 +23,56 @@ let cachedConfig: AppConfig | null = null;
 const buildApp = (config: AppConfig) => {
   const app = new Hono<{ Bindings: EnvBindings; Variables: AppVariables }>();
 
-  app.use("*", async (c, next) => {
-    const requestId = c.req.header("cf-ray") ?? crypto.randomUUID();
+  app.use('*', async (c, next) => {
+    const requestId = c.req.header('cf-ray') ?? crypto.randomUUID();
     const container: ServiceContainer = createRequestContext(c.env, requestId, config);
-    c.set("container", container);
-    c.set("requestId", requestId);
-    c.set("executionCtx", c.executionCtx);
+    c.set('container', container);
+    c.set('requestId', requestId);
+    c.set('executionCtx', c.executionCtx);
     await next();
   });
 
   app.use(
-    "*",
+    '*',
     cors({
       origin: (origin) => {
-        if (!origin) return "*";
+        if (!origin) return '*';
 
         const allowedOrigins = [
           // album.memorylocks.com removed - now same-origin (served by same worker)
           // Allow localhost in development for testing
-          ...(config.environment === "development" ? ["http://localhost:3000"] : []),
+          ...(config.environment === 'development' ? ['http://localhost:3000'] : []),
         ];
         return allowedOrigins.includes(origin) ? origin : null;
       },
-      allowHeaders: ["Content-Type", "Authorization", "Create-Lock-Key"],
-      allowMethods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+      allowHeaders: ['Content-Type', 'Authorization', 'Create-Lock-Key'],
+      allowMethods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
       credentials: true,
     })
   );
 
-  app.use("*", secureHeaders());
-  app.use("*", requestLogger());
+  app.use('*', secureHeaders());
+  app.use('*', requestLogger());
 
   // Web album routes for album.memorylocks.com (has access to container middleware above)
-  app.route("/", createWebAlbumRoutes());
+  app.route('/', createWebAlbumRoutes());
 
   // API routes (for api.memorylocks.com and other hosts)
-  app.route("/", createSystemRoutes());
-  app.route("/users", createUserRoutes(config));
-  app.route("/locks", createLockRoutes(config));
-  app.route("/media-objects", createMediaObjectRoutes(config));
+  app.route('/', createSystemRoutes());
+  app.route('/users', createUserRoutes(config));
+  app.route('/locks', createLockRoutes(config));
+  app.route('/media-objects', createMediaObjectRoutes(config));
 
-  app.route("/album", createAlbumRoutes(config));
+  app.route('/album', createAlbumRoutes(config));
 
-  app.route("/push-notifications", createPushNotificationRoutes(config));
+  app.route('/push-notifications', createPushNotificationRoutes(config));
 
-  app.route("/", createRevenueCatRoutes(config));
+  app.route('/', createRevenueCatRoutes(config));
 
   app.notFound((c) => {
     const response = {
-      error: "Endpoint not found",
-      code: "NOT_FOUND",
+      error: 'Endpoint not found',
+      code: 'NOT_FOUND',
     };
     return c.json(response, 404);
   });
@@ -98,12 +98,12 @@ export default {
 
   async scheduled(event: ScheduledEvent, env: EnvBindings, ctx: ExecutionContext) {
     try {
-      if (event.cron === "0 */12 * * *") {
+      if (event.cron === '0 */12 * * *') {
         // Every 12 hours: process Cloudflare cleanup jobs
         await processCleanupJobs(env, ctx);
       }
     } catch (error) {
-      console.error("Scheduled job failed", { cron: event.cron, error: String(error) });
+      console.error('Scheduled job failed', { cron: event.cron, error: String(error) });
       throw error; // Re-throw to mark cron execution as failed
     }
   },

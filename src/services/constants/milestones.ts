@@ -9,7 +9,7 @@ export const getMilestoneMessage = (milestone: Milestone, lockName: string, scan
   switch (milestone) {
     case 1:
       return {
-        title: "Your first scan! 🥳",
+        title: 'Your first scan! 🥳',
         body: `Someone just unlocked ${lockName} for the very first time — the story officially begins!`,
       };
     case 25:
@@ -20,7 +20,7 @@ export const getMilestoneMessage = (milestone: Milestone, lockName: string, scan
     case 50:
       return {
         title: `${scanCount} scans — that's a crowd! 🎉`,
-        body: "Fifty people have peeked into your memories. You might be the next local legend at this rate.",
+        body: 'Fifty people have peeked into your memories. You might be the next local legend at this rate.',
       };
     case 75:
       return {
@@ -29,7 +29,7 @@ export const getMilestoneMessage = (milestone: Milestone, lockName: string, scan
       };
     case 100:
       return {
-        title: "💯 scans! Certified Memory Lock classic",
+        title: '💯 scans! Certified Memory Lock classic',
         body: `You've hit ${scanCount} scans! That's a hundred people who've relived a little piece of your story.`,
       };
     case 250:
@@ -54,4 +54,3 @@ export const getMilestoneMessage = (milestone: Milestone, lockName: string, scan
       };
   }
 };
-

@@ -1,9 +1,9 @@
-import { SignJWT, jwtVerify, JWTPayload } from "jose";
-import { JwtConfig } from "../../config/env";
+import { SignJWT, jwtVerify, JWTPayload } from 'jose';
+import { JwtConfig } from '../../config/env';
 
 interface JwtClaims extends JWTPayload {
   userId: number;
-  tokenType: "access" | "refresh";
+  tokenType: 'access' | 'refresh';
 }
 
 export interface JwtService {
@@ -18,9 +18,13 @@ const encoder = new TextEncoder();
 export const createJwtService = (config: JwtConfig): JwtService => {
   const key = encoder.encode(config.secret);
 
-  const sign = async (userId: number, tokenType: "access" | "refresh", expiresInMinutes: number): Promise<string> => {
+  const sign = async (
+    userId: number,
+    tokenType: 'access' | 'refresh',
+    expiresInMinutes: number
+  ): Promise<string> => {
     const jwt = new SignJWT({ userId, tokenType })
-      .setProtectedHeader({ alg: "HS256" })
+      .setProtectedHeader({ alg: 'HS256' })
       .setIssuer(config.issuer)
       .setAudience(config.audience)
       .setSubject(String(userId))
@@ -38,7 +42,10 @@ export const createJwtService = (config: JwtConfig): JwtService => {
         audience: config.audience,
       });
 
-      if (typeof payload.userId !== "number" || (payload.tokenType !== "access" && payload.tokenType !== "refresh")) {
+      if (
+        typeof payload.userId !== 'number' ||
+        (payload.tokenType !== 'access' && payload.tokenType !== 'refresh')
+      ) {
         return null;
       }
 
@@ -49,16 +56,16 @@ export const createJwtService = (config: JwtConfig): JwtService => {
   };
 
   return {
-    generateAccessToken: (userId) => sign(userId, "access", config.accessTokenExpiryHours * 60),
+    generateAccessToken: (userId) => sign(userId, 'access', config.accessTokenExpiryHours * 60),
     generateRefreshToken: (userId) =>
-      sign(userId, "refresh", config.refreshTokenExpiryDays * 24 * 60),
+      sign(userId, 'refresh', config.refreshTokenExpiryDays * 24 * 60),
     validateRefreshToken: async (token) => {
       const result = await verify(token);
-      return result?.tokenType === "refresh" || false;
+      return result?.tokenType === 'refresh' || false;
     },
     getUserIdFromRefreshToken: async (token) => {
       const result = await verify(token);
-      return result?.tokenType === "refresh" ? result.userId : null;
+      return result?.tokenType === 'refresh' ? result.userId : null;
     },
   };
 };

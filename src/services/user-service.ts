@@ -1,23 +1,23 @@
-import { Logger } from "../../common/logger";
-import { failure, ServiceResult, success } from "../../common/result";
-import { UserRepository } from "../../data/repositories/user-repository";
-import { LockRepository } from "../../data/repositories/lock-repository";
-import { MediaObjectRepository } from "../../data/repositories/media-object-repository";
-import { CleanupJobRepository } from "../../data/repositories/cleanup-job-repository";
-import { mapUserRowToProfile } from "../../data/mappers/user-mapper";
-import type { DrizzleClient } from "../../data/db";
-import { users, locks, mediaObjects } from "../../data/schema";
-import { eq } from "drizzle-orm";
+import { Logger } from '../common/logger';
+import { failure, ServiceResult, success } from '../common/result';
+import { UserRepository } from '../data/repositories/user-repository';
+import { LockRepository } from '../data/repositories/lock-repository';
+import { MediaObjectRepository } from '../data/repositories/media-object-repository';
+import { CleanupJobRepository } from '../data/repositories/cleanup-job-repository';
+import { mapUserRowToProfile } from '../data/mappers/user-mapper';
+import type { DrizzleClient } from '../data/db';
+import { users, locks, mediaObjects } from '../data/schema';
+import { eq } from 'drizzle-orm';
 import type {
   RemoveIdentifierRequest,
   UpdateDeviceTokenRequest,
   UpdateUserNameRequest,
   UserProfile,
   VerifyIdentifierRequest,
-} from "../dtos/users";
-import type { TwilioVerifyClient } from "../../infrastructure/Auth/twilio";
+} from './dtos/users';
+import type { TwilioVerifyClient } from '../infrastructure/Auth/twilio';
 
-const sanitizePhone = (phone: string) => phone.replace(/\s+/g, "");
+const sanitizePhone = (phone: string) => phone.replace(/\s+/g, '');
 
 export class UserService {
   constructor(
@@ -32,7 +32,7 @@ export class UserService {
 
   private ensureTwilio(): TwilioVerifyClient {
     if (!this.twilioClient) {
-      throw new Error("Twilio Verify is not configured");
+      throw new Error('Twilio Verify is not configured');
     }
     return this.twilioClient;
   }
@@ -40,25 +40,28 @@ export class UserService {
   async getProfile(userId: number): Promise<ServiceResult<UserProfile>> {
     const user = await this.userRepository.findById(userId);
     if (!user) {
-      return failure("USER_NOT_FOUND", "User not found", undefined, 404);
+      return failure('USER_NOT_FOUND', 'User not found', undefined, 404);
     }
 
     return success(mapUserRowToProfile(user));
   }
 
-  async updateName(userId: number, request: UpdateUserNameRequest): Promise<ServiceResult<UserProfile>> {
+  async updateName(
+    userId: number,
+    request: UpdateUserNameRequest
+  ): Promise<ServiceResult<UserProfile>> {
     const trimmed = request.name?.trim();
     if (!trimmed) {
-      return failure("INVALID_NAME", "Name is required", undefined, 400);
+      return failure('INVALID_NAME', 'Name is required', undefined, 400);
     }
 
     if (trimmed.length > 120) {
-      return failure("INVALID_NAME", "Name must be 120 characters or fewer", undefined, 400);
+      return failure('INVALID_NAME', 'Name must be 120 characters or fewer', undefined, 400);
     }
 
     const user = await this.userRepository.findById(userId);
     if (!user) {
-      return failure("USER_NOT_FOUND", "User not found", undefined, 404);
+      return failure('USER_NOT_FOUND', 'User not found', undefined, 404);
     }
 
     if (user.name?.trim() !== trimmed) {
@@ -67,27 +70,32 @@ export class UserService {
 
     const updated = await this.userRepository.findById(userId);
     if (!updated) {
-      return failure("USER_NOT_FOUND", "Failed to load updated user", undefined, 500);
+      return failure('USER_NOT_FOUND', 'Failed to load updated user', undefined, 500);
     }
 
-    return success(mapUserRowToProfile(updated), "User name updated successfully");
+    return success(mapUserRowToProfile(updated), 'User name updated successfully');
   }
 
   async verifyIdentifier(request: VerifyIdentifierRequest): Promise<ServiceResult<boolean>> {
     if (!request.identifier || !request.verifyCode) {
-      return failure("INVALID_REQUEST", "Identifier and verification code are required", undefined, 400);
+      return failure(
+        'INVALID_REQUEST',
+        'Identifier and verification code are required',
+        undefined,
+        400
+      );
     }
 
     const user = await this.userRepository.findById(request.userId);
     if (!user) {
-      return failure("USER_NOT_FOUND", "User not found", undefined, 404);
+      return failure('USER_NOT_FOUND', 'User not found', undefined, 404);
     }
 
     const twilio = this.ensureTwilio();
     const identifier = request.identifier.trim();
     const verified = await twilio.verifyCode(identifier, request.verifyCode);
     if (!verified) {
-      return failure("INVALID_CODE", "Invalid verification code", undefined, 400);
+      return failure('INVALID_CODE', 'Invalid verification code', undefined, 400);
     }
 
     try {
@@ -96,7 +104,7 @@ export class UserService {
         const normalized = identifier.toLowerCase();
         const existing = await this.userRepository.findByEmailCaseInsensitive(normalized);
         if (existing && existing.id !== request.userId) {
-          return failure("EMAIL_IN_USE", "Email address is already in use", undefined, 409);
+          return failure('EMAIL_IN_USE', 'Email address is already in use', undefined, 409);
         }
 
         // Update atomically using batch
@@ -107,38 +115,42 @@ export class UserService {
       } else {
         const sanitized = sanitizePhone(identifier);
         const existingByPhone = await this.userRepository.findByPhoneNumber(sanitized);
-        const existingByNormalized = await this.userRepository.findByNormalizedPhoneNumber(sanitized);
+        const existingByNormalized =
+          await this.userRepository.findByNormalizedPhoneNumber(sanitized);
         const existing = existingByPhone ?? existingByNormalized;
 
         if (existing && existing.id !== request.userId) {
-          return failure("PHONE_IN_USE", "Phone number is already in use", undefined, 409);
+          return failure('PHONE_IN_USE', 'Phone number is already in use', undefined, 409);
         }
 
         // Update atomically using batch
         await this.db.batch([
-          this.db.update(users).set({ phone_number: sanitized }).where(eq(users.id, request.userId)),
+          this.db
+            .update(users)
+            .set({ phone_number: sanitized })
+            .where(eq(users.id, request.userId)),
           this.db.update(users).set({ phone_verified: true }).where(eq(users.id, request.userId)),
         ] as any);
       }
 
-      return success(true, "Identifier verified successfully");
+      return success(true, 'Identifier verified successfully');
     } catch (error) {
       const errorMsg = String(error);
-      if (errorMsg.includes("EMAIL_IN_USE")) {
-        return failure("EMAIL_IN_USE", "Email address is already in use", undefined, 409);
+      if (errorMsg.includes('EMAIL_IN_USE')) {
+        return failure('EMAIL_IN_USE', 'Email address is already in use', undefined, 409);
       }
-      if (errorMsg.includes("PHONE_IN_USE")) {
-        return failure("PHONE_IN_USE", "Phone number is already in use", undefined, 409);
+      if (errorMsg.includes('PHONE_IN_USE')) {
+        return failure('PHONE_IN_USE', 'Phone number is already in use', undefined, 409);
       }
-      this.logger.error("Failed to verify identifier", { userId: request.userId, error: errorMsg });
-      return failure("VERIFY_FAILED", "Failed to verify identifier", undefined, 500);
+      this.logger.error('Failed to verify identifier', { userId: request.userId, error: errorMsg });
+      return failure('VERIFY_FAILED', 'Failed to verify identifier', undefined, 500);
     }
   }
 
   async removeIdentifier(request: RemoveIdentifierRequest): Promise<ServiceResult<boolean>> {
     const user = await this.userRepository.findById(request.userId);
     if (!user) {
-      return failure("USER_NOT_FOUND", "User not found", undefined, 404);
+      return failure('USER_NOT_FOUND', 'User not found', undefined, 404);
     }
 
     const hasEmail = !!(user.email && user.email_verified);
@@ -146,47 +158,62 @@ export class UserService {
 
     if (request.isEmail) {
       if (!hasPhone) {
-        return failure("CANNOT_REMOVE_LAST", "Cannot remove the last verified identifier. You must have at least one verified email or phone number.", undefined, 400);
+        return failure(
+          'CANNOT_REMOVE_LAST',
+          'Cannot remove the last verified identifier. You must have at least one verified email or phone number.',
+          undefined,
+          400
+        );
       }
-      await this.db.update(users)
+      await this.db
+        .update(users)
         .set({ email: null, email_verified: false })
         .where(eq(users.id, request.userId));
     } else {
       if (!hasEmail) {
-        return failure("CANNOT_REMOVE_LAST", "Cannot remove the last verified identifier. You must have at least one verified email or phone number.", undefined, 400);
+        return failure(
+          'CANNOT_REMOVE_LAST',
+          'Cannot remove the last verified identifier. You must have at least one verified email or phone number.',
+          undefined,
+          400
+        );
       }
-      await this.db.update(users)
+      await this.db
+        .update(users)
         .set({ phone_number: null, phone_verified: false })
         .where(eq(users.id, request.userId));
     }
 
-    return success(true, "Identifier removed successfully");
+    return success(true, 'Identifier removed successfully');
   }
 
-  async updateDeviceToken(userId: number, request: UpdateDeviceTokenRequest): Promise<ServiceResult<boolean>> {
+  async updateDeviceToken(
+    userId: number,
+    request: UpdateDeviceTokenRequest
+  ): Promise<ServiceResult<boolean>> {
     if (!request.deviceToken || request.deviceToken.trim().length === 0) {
-      return failure("INVALID_TOKEN", "Device token is required", undefined, 400);
+      return failure('INVALID_TOKEN', 'Device token is required', undefined, 400);
     }
 
     const user = await this.userRepository.findById(userId);
     if (!user) {
-      return failure("USER_NOT_FOUND", "User not found", undefined, 404);
+      return failure('USER_NOT_FOUND', 'User not found', undefined, 404);
     }
 
     await this.userRepository.updateDeviceToken(userId, request.deviceToken.trim());
-    return success(true, "Device token updated successfully");
+    return success(true, 'Device token updated successfully');
   }
 
   async deleteAccount(userId: number, deleteMedia: boolean): Promise<ServiceResult<boolean>> {
     const user = await this.userRepository.findById(userId);
     if (!user) {
-      return failure("USER_NOT_FOUND", "User not found", undefined, 404);
+      return failure('USER_NOT_FOUND', 'User not found', undefined, 404);
     }
 
     try {
       // Wrap all DB operations in transaction
       // Collect all data before starting the batch transaction
-      const cleanupList: Array<{ cloudflare_id: string; media_type: "image" | "video" }> = [];
+      const cleanupList: Array<{ cloudflare_id: string; media_type: 'image' | 'video' }> = [];
       const mediaDeletes: number[] = [];
 
       if (deleteMedia) {
@@ -200,7 +227,7 @@ export class UserService {
             if (media.cloudflare_id) {
               cleanupList.push({
                 cloudflare_id: media.cloudflare_id,
-                media_type: media.is_image ? "image" : "video",
+                media_type: media.is_image ? 'image' : 'video',
               });
             }
             mediaDeletes.push(lock.id); // Track lock IDs for batch deletion
@@ -218,7 +245,9 @@ export class UserService {
       }
 
       // Clear lock associations (set user_id to NULL)
-      batchQueries.push(this.db.update(locks).set({ user_id: null }).where(eq(locks.user_id, userId)));
+      batchQueries.push(
+        this.db.update(locks).set({ user_id: null }).where(eq(locks.user_id, userId))
+      );
 
       // Delete the user
       batchQueries.push(this.db.delete(users).where(eq(users.id, userId)));
@@ -236,27 +265,27 @@ export class UserService {
             cloudflare_id: media.cloudflare_id,
             media_type: media.media_type,
           });
-          this.logger.info("Scheduled Cloudflare cleanup job for account deletion", {
+          this.logger.info('Scheduled Cloudflare cleanup job for account deletion', {
             cloudflareId: media.cloudflare_id,
           });
         } catch (cleanupError) {
-          this.logger.warn("Failed to schedule Cloudflare cleanup", {
+          this.logger.warn('Failed to schedule Cloudflare cleanup', {
             cloudflareId: media.cloudflare_id,
             error: String(cleanupError),
           });
         }
       }
 
-      return success(true, deleteMedia ? "User and media deleted" : "User deleted");
+      return success(true, deleteMedia ? 'User and media deleted' : 'User deleted');
     } catch (error) {
-      this.logger.error("Failed to delete account", { userId, error: String(error) });
-      return failure("DELETE_FAILED", "Failed to delete account", undefined, 500);
+      this.logger.error('Failed to delete account', { userId, error: String(error) });
+      return failure('DELETE_FAILED', 'Failed to delete account', undefined, 500);
     }
   }
 
   async resendTwilioCode(isEmail: boolean, identifier: string): Promise<ServiceResult<boolean>> {
     if (!identifier) {
-      return failure("INVALID_IDENTIFIER", "Identifier is required", undefined, 400);
+      return failure('INVALID_IDENTIFIER', 'Identifier is required', undefined, 400);
     }
 
     try {
@@ -265,13 +294,12 @@ export class UserService {
         ? await twilio.sendEmailVerification(identifier)
         : await twilio.sendSmsVerification(identifier);
       if (!sent) {
-        return failure("TWILIO_ERROR", "Failed to send verification code", undefined, 502);
+        return failure('TWILIO_ERROR', 'Failed to send verification code', undefined, 502);
       }
-      return success(true, "Verification code sent");
+      return success(true, 'Verification code sent');
     } catch (error) {
-      this.logger.error("Resend verification failed", { error: String(error) });
-      return failure("TWILIO_ERROR", "Failed to send verification code", undefined, 502);
+      this.logger.error('Resend verification failed', { error: String(error) });
+      return failure('TWILIO_ERROR', 'Failed to send verification code', undefined, 502);
     }
   }
 }
-

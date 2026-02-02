@@ -1,9 +1,6 @@
-import type { Context, MiddlewareHandler } from "hono";
-import type { AppConfig } from "../../config/env";
-import type { ApiError } from "./responses";
-
-// Rate limiting is now handled by Cloudflare Rate Limiting Rules (configured in Cloudflare Dashboard)
-// Previous in-memory rate limiter removed in favor of edge-native solution
+import type { Context, MiddlewareHandler } from 'hono';
+import type { AppConfig } from '../../config/env';
+import type { ApiError } from './responses';
 
 /**
  * Middleware that extracts the userId from the JWT payload and stores it in the context.
@@ -13,20 +10,20 @@ import type { ApiError } from "./responses";
  */
 export const setUserContext = (): MiddlewareHandler => {
   return async (c, next) => {
-    const payload = c.get("jwtPayload") as { userId?: number } | undefined;
+    const payload = c.get('jwtPayload') as { userId?: number } | undefined;
     if (!payload?.userId) {
-      return c.json({ error: "User identifier missing from token" } as ApiError, 401);
+      return c.json({ error: 'User identifier missing from token' } as ApiError, 401);
     }
-    c.set("userId", Number(payload.userId));
+    c.set('userId', Number(payload.userId));
     return await next();
   };
 };
 
 export const createLockKeyAuth = (config: AppConfig): MiddlewareHandler => {
   return async (c, next) => {
-    const header = c.req.header("Create-Lock-Key");
+    const header = c.req.header('Create-Lock-Key');
     if (!header || header.trim() !== config.createLockApiKey) {
-      return c.json({ error: "Invalid create-lock API key" } as ApiError, 401);
+      return c.json({ error: 'Invalid create-lock API key' } as ApiError, 401);
     }
     return await next();
   };
@@ -34,9 +31,9 @@ export const createLockKeyAuth = (config: AppConfig): MiddlewareHandler => {
 
 export const createPushNotificationKeyAuth = (config: AppConfig): MiddlewareHandler => {
   return async (c, next) => {
-    const header = c.req.header("Push-Notification-Key");
+    const header = c.req.header('Push-Notification-Key');
     if (!header || header.trim() !== config.pushNotificationKey) {
-      return c.json({ error: "Invalid push notification API key" } as ApiError, 401);
+      return c.json({ error: 'Invalid push notification API key' } as ApiError, 401);
     }
     return await next();
   };
@@ -47,11 +44,19 @@ export const requestLogger = (): MiddlewareHandler => {
     const start = Date.now();
     await next();
     const ms = Date.now() - start;
-    console.log(`${c.req.method} ${c.req.path} -> ${c.res.status} (${ms}ms)`);
+    const container = c.get('container');
+    if (container?.logger) {
+      container.logger.info(`${c.req.method} ${c.req.path} -> ${c.res.status} (${ms}ms)`);
+    } else {
+      console.log(`${c.req.method} ${c.req.path} -> ${c.res.status} (${ms}ms)`);
+    }
   };
 };
 
-export const allowPublic = (predicate: (c: Context) => boolean, middleware: MiddlewareHandler): MiddlewareHandler => {
+export const allowPublic = (
+  predicate: (c: Context) => boolean,
+  middleware: MiddlewareHandler
+): MiddlewareHandler => {
   return async (c, next) => {
     if (predicate(c)) {
       return await next();
@@ -80,13 +85,13 @@ export const allowPublic = (predicate: (c: Context) => boolean, middleware: Midd
  * IMPORTANT: Do NOT store 5xx server errors (they should be retried).
  */
 export const idempotencyMiddleware: MiddlewareHandler = async (c, next) => {
-  const container = c.get("container");
+  const container = c.get('container');
   const idempotencyService = container.idempotencyService;
 
   // Require client to provide idempotency key
-  const key = c.req.header("Idempotency-Key");
+  const key = c.req.header('Idempotency-Key');
   if (!key) {
-    return c.json({ error: "Idempotency-Key header is required" } as ApiError, 400);
+    return c.json({ error: 'Idempotency-Key header is required' } as ApiError, 400);
   }
 
   const endpoint = c.req.path;
@@ -109,7 +114,7 @@ export const idempotencyMiddleware: MiddlewareHandler = async (c, next) => {
       await idempotencyService.storeResult(key, endpoint, status, responseBody);
     } catch (error) {
       // Failed to cache result - log but don't fail the request
-      console.error("Failed to store idempotency result", { key, endpoint, error });
+      console.error('Failed to store idempotency result', { key, endpoint, error });
     }
   }
 };
@@ -129,22 +134,22 @@ export const idempotencyMiddleware: MiddlewareHandler = async (c, next) => {
 export const createRevenueCatWebhookAuth = (config: AppConfig): MiddlewareHandler => {
   return async (c, next) => {
     if (!config.revenueCat) {
-      return c.json({ error: "RevenueCat not configured" } as ApiError, 503);
+      return c.json({ error: 'RevenueCat not configured' } as ApiError, 503);
     }
 
-    const authHeader = c.req.header("Authorization");
+    const authHeader = c.req.header('Authorization');
     if (!authHeader) {
-      return c.json({ error: "Authorization header required" } as ApiError, 401);
+      return c.json({ error: 'Authorization header required' } as ApiError, 401);
     }
 
     // RevenueCat sends: Authorization: Bearer <webhook_auth_key>
     // We accept both "Bearer <key>" and just "<key>" for flexibility
-    const providedKey = authHeader.startsWith("Bearer ")
+    const providedKey = authHeader.startsWith('Bearer ')
       ? authHeader.substring(7).trim()
       : authHeader.trim();
 
     if (providedKey !== config.revenueCat.webhookAuthKey) {
-      return c.json({ error: "Invalid webhook authorization" } as ApiError, 401);
+      return c.json({ error: 'Invalid webhook authorization' } as ApiError, 401);
     }
 
     return await next();

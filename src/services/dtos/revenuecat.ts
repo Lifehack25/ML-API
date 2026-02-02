@@ -14,7 +14,7 @@ export interface RevenueCatEvent {
   entitlement_ids: string[] | null;
   purchased_at_ms: number;
   store: RevenueCatStore;
-  environment: "SANDBOX" | "PRODUCTION";
+  environment: 'SANDBOX' | 'PRODUCTION';
   price: number | null;
   currency: string;
   price_in_purchased_currency: number;
@@ -31,16 +31,16 @@ export interface RevenueCatAttribute {
 }
 
 export type RevenueCatEventType =
-  | "INITIAL_PURCHASE"
-  | "NON_RENEWING_PURCHASE"
-  | "RENEWAL"
-  | "CANCELLATION"
-  | "EXPIRATION"
-  | "BILLING_ISSUE"
-  | "PRODUCT_CHANGE";
+  | 'INITIAL_PURCHASE'
+  | 'NON_RENEWING_PURCHASE'
+  | 'RENEWAL'
+  | 'CANCELLATION'
+  | 'EXPIRATION'
+  | 'BILLING_ISSUE'
+  | 'PRODUCT_CHANGE';
 
-export type RevenueCatStore = "APP_STORE" | "PLAY_STORE" | "STRIPE" | "PROMOTIONAL";
+export type RevenueCatStore = 'APP_STORE' | 'PLAY_STORE' | 'STRIPE' | 'PROMOTIONAL';
 
 // Product IDs (must match MAUI app)
-export const UNSEAL_PRODUCT_ID = "prod97978575cd";
-export const STORAGE_UPGRADE_PRODUCT_ID = "prod81a0ffc5ab";
+export const UNSEAL_PRODUCT_ID = 'com.memorylocks.app.unseal_lock';
+export const STORAGE_UPGRADE_PRODUCT_ID = 'com.memorylocks.app.upgrade_album_storage';

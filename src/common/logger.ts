@@ -6,31 +6,34 @@ export interface Logger {
 }
 
 export const createLogger = (requestId?: string): Logger => {
-  const prefix = requestId ? `[req:${requestId}]` : "";
+  const prefix = requestId ? `[req:${requestId}]` : '';
 
-  const log = (level: "info" | "warn" | "error" | "debug", message: string, meta?: Record<string, unknown>) => {
+  const log = (
+    level: 'info' | 'warn' | 'error' | 'debug',
+    message: string,
+    meta?: Record<string, unknown>
+  ) => {
     const payload = meta ? { ...meta, message } : message;
     switch (level) {
-      case "info":
+      case 'info':
         console.log(prefix, payload);
         break;
-      case "warn":
+      case 'warn':
         console.warn(prefix, payload);
         break;
-      case "error":
+      case 'error':
         console.error(prefix, payload);
         break;
-      case "debug":
+      case 'debug':
         console.debug(prefix, payload);
         break;
     }
   };
 
   return {
-    info: (message, meta) => log("info", message, meta),
-    warn: (message, meta) => log("warn", message, meta),
-    error: (message, meta) => log("error", message, meta),
-    debug: (message, meta) => log("debug", message, meta),
+    info: (message, meta) => log('info', message, meta),
+    warn: (message, meta) => log('warn', message, meta),
+    error: (message, meta) => log('error', message, meta),
+    debug: (message, meta) => log('debug', message, meta),
   };
 };
-

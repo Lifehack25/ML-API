@@ -1,13 +1,17 @@
-import { eq, and, sql } from "drizzle-orm";
-import type { DrizzleClient } from "../db";
-import { users, type User } from "../schema";
-import type { CreateUserRequest } from "../../services/dtos/users";
+import { eq, and, sql } from 'drizzle-orm';
+import type { DrizzleClient } from '../db';
+import { users, type User } from '../schema';
+import type { CreateUserRequest } from '../../services/dtos/users';
 
 const sanitizePhone = (value: string | null | undefined): string | null => {
   if (!value) return null;
-  return value.replace(/[\s\-()+]/g, "");
+  return value.replace(/[\s\-()+]/g, '');
 };
 
+/**
+ * Repository for managing User entities.
+ * Handles CRUD operations and authentication provider linkage.
+ */
 export class UserRepository {
   constructor(private readonly db: DrizzleClient) {}
 
@@ -22,7 +26,7 @@ export class UserRepository {
       name: data.name.trim(),
       email: data.email ?? null,
       phone_number: data.phoneNumber ?? null,
-      auth_provider: data.authProvider ?? "",
+      auth_provider: data.authProvider ?? '',
       provider_id: data.providerId ?? null,
       email_verified: data.emailVerified ?? false,
       phone_verified: data.phoneVerified ?? false,
@@ -33,7 +37,7 @@ export class UserRepository {
     const result = await this.db.insert(users).values(payload).returning();
 
     if (!result[0]) {
-      throw new Error("Failed to create user");
+      throw new Error('Failed to create user');
     }
 
     return result[0];
@@ -118,11 +122,11 @@ export class UserRepository {
   ): Promise<void> {
     const updates: Partial<User> = {};
 
-    if (typeof metadata.emailVerified === "boolean") {
+    if (typeof metadata.emailVerified === 'boolean') {
       updates.email_verified = metadata.emailVerified;
     }
 
-    if (typeof metadata.phoneVerified === "boolean") {
+    if (typeof metadata.phoneVerified === 'boolean') {
       updates.phone_verified = metadata.phoneVerified;
     }
 

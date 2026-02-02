@@ -52,7 +52,7 @@ export class IdempotencyService {
    */
   async checkIdempotency(key: string, endpoint: string): Promise<CachedResponse | null> {
     const kvKey = this.buildKvKey(key, endpoint);
-    const cached = await this.kv.get<StoredValue>(kvKey, "json");
+    const cached = await this.kv.get<StoredValue>(kvKey, 'json');
 
     if (!cached) {
       return null;
@@ -102,7 +102,7 @@ export class IdempotencyService {
    */
   private buildKvKey(key: string, endpoint: string): string {
     // Normalize endpoint by removing leading slash and replacing slashes with colons
-    const normalizedEndpoint = endpoint.replace(/^\//, "").replace(/\//g, ":");
+    const normalizedEndpoint = endpoint.replace(/^\//, '').replace(/\//g, ':');
     return `idempotency:${normalizedEndpoint}:${key}`;
   }
 }
@@ -122,7 +122,7 @@ export function generateIdempotencyKey(): string {
   bytes[6] = (bytes[6] & 0x0f) | 0x40; // Version 4
   bytes[8] = (bytes[8] & 0x3f) | 0x80; // Variant RFC4122
 
-  const hex = Array.from(bytes, (byte) => byte.toString(16).padStart(2, "0")).join("");
+  const hex = Array.from(bytes, (byte) => byte.toString(16).padStart(2, '0')).join('');
 
   return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
 }

@@ -6,10 +6,10 @@
  * are incremented in the background.
  */
 
-import { Logger } from "../../common/logger";
-import { LockRepository } from "../../data/repositories/lock-repository";
-import { NotificationService } from "./notification-service";
-import { getMilestoneMessage, isSupportedMilestone } from "../constants/milestones";
+import { Logger } from '../common/logger';
+import { LockRepository } from '../data/repositories/lock-repository';
+import { NotificationService } from './notification-service';
+import { getMilestoneMessage, isSupportedMilestone } from './constants/milestones';
 
 export class ScanCounterService {
   constructor(
@@ -31,7 +31,7 @@ export class ScanCounterService {
 
       // Check if milestone was reached and notification should be sent
       if (milestoneReached && lock.user_id && isSupportedMilestone(milestoneReached)) {
-        const lockName = lock.lock_name?.trim() || "your Memory Lock";
+        const lockName = lock.lock_name?.trim() || 'your Memory Lock';
         const message = getMilestoneMessage(milestoneReached, lockName, lock.scan_count);
 
         if (message) {
@@ -47,13 +47,13 @@ export class ScanCounterService {
           });
 
           if (!notificationResult.ok) {
-            this.logger.warn("Milestone notification failed", {
+            this.logger.warn('Milestone notification failed', {
               lockId,
               milestone: milestoneReached,
               error: notificationResult.error,
             });
           } else {
-            this.logger.info("Milestone notification sent successfully", {
+            this.logger.info('Milestone notification sent successfully', {
               lockId,
               milestone: milestoneReached,
               userId: lock.user_id,
@@ -62,15 +62,15 @@ export class ScanCounterService {
         }
       }
 
-      this.logger.debug("Scan count incremented", {
+      this.logger.debug('Scan count incremented', {
         lockId,
         newScanCount: lock.scan_count,
-        milestoneReached: milestoneReached || "none",
+        milestoneReached: milestoneReached || 'none',
       });
     } catch (error) {
       // Log error but don't throw - we don't want to break the Worker
       // if scan counting fails (the cached response is already returned)
-      this.logger.error("Failed to increment scan count", {
+      this.logger.error('Failed to increment scan count', {
         lockId,
         error: String(error),
       });

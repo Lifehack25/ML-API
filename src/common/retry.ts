@@ -1,4 +1,4 @@
-import { Logger } from "./logger";
+import { Logger } from './logger';
 
 export interface RetryOptions {
   maxAttempts?: number;
@@ -19,9 +19,9 @@ const defaultOptions: Required<RetryOptions> = {
  * Matches the behavior of ASP.NET Core's RetryHelper.ExecuteWithRetryAsync.
  */
 export async function executeWithRetry<T>(
-    operation: () => Promise<T>,
-    options: RetryOptions = {},
-    logger?: Logger
+  operation: () => Promise<T>,
+  options: RetryOptions = {},
+  logger?: Logger
 ): Promise<T> {
   const opts = { ...defaultOptions, ...options };
   let lastError: Error | unknown;
@@ -34,14 +34,14 @@ export async function executeWithRetry<T>(
       lastError = error;
 
       if (attempt === opts.maxAttempts) {
-        logger?.error("Retry attempts exhausted", {
+        logger?.error('Retry attempts exhausted', {
           attempts: attempt,
           error: String(error),
         });
         throw error;
       }
 
-      logger?.warn("Operation failed, retrying", {
+      logger?.warn('Operation failed, retrying', {
         attempt,
         maxAttempts: opts.maxAttempts,
         delayMs,

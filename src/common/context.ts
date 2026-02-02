@@ -1,31 +1,31 @@
-import { createLogger } from "./logger";
-import type { EnvBindings } from "./bindings";
-import { createHashIdHelper } from "./hashids";
-import { loadConfig, type AppConfig } from "../config/env";
-import { createTwilioVerifyClient } from "../infrastructure/Auth/twilio";
-import { createSightengineClient } from "../infrastructure/sightengine";
-import { createCloudflareMediaClient } from "../infrastructure/cloudflare";
-import { createFirebaseMessagingClient } from "../infrastructure/firebase";
-import { createAppleVerifier } from "../infrastructure/Auth/oauth-apple";
-import { createGoogleVerifier } from "../infrastructure/Auth/oauth-google";
-import { createJwtService } from "../infrastructure/Auth/jwt";
-import { IdempotencyService } from "../infrastructure/idempotency";
-import { createDrizzleClient, type DrizzleClient } from "../data/db";
-import { UserRepository } from "../data/repositories/user-repository";
-import { LockRepository } from "../data/repositories/lock-repository";
-import { MediaObjectRepository } from "../data/repositories/media-object-repository";
-import { CleanupJobRepository } from "../data/repositories/cleanup-job-repository";
-import { ManageMediaService } from "../services/services/manage-media-service";
-import { LockService } from "../services/services/lock-service";
-import { SessionTokenService } from "../services/services/session-token-service";
-import { OAuthUserLinkService } from "../services/services/oauth-user-link-service";
-import { NotificationService } from "../services/services/notification-service";
-import { ViewAlbumService } from "../services/services/view-album-service";
-import { UserAuthFlowService } from "../services/services/user-auth-flow-service";
-import { UserService } from "../services/services/user-service";
-import { ScanCounterService } from "../services/services/scan-counter-service";
-import { RevenueCatWebhookService } from "../services/services/revenuecat-webhook-service";
-import type { Logger } from "./logger";
+import { createLogger } from './logger';
+import type { EnvBindings } from './bindings';
+import { createHashIdHelper } from './hashids';
+import { loadConfig, type AppConfig } from '../config/env';
+import { createTwilioVerifyClient } from '../infrastructure/Auth/twilio';
+import { createSightengineClient } from '../infrastructure/sightengine';
+import { createCloudflareMediaClient } from '../infrastructure/cloudflare-media';
+import { createFirebaseMessagingClient } from '../infrastructure/firebase';
+import { createAppleVerifier } from '../infrastructure/Auth/oauth-apple';
+import { createGoogleVerifier } from '../infrastructure/Auth/oauth-google';
+import { createJwtService } from '../infrastructure/Auth/jwt';
+import { IdempotencyService } from '../infrastructure/idempotency';
+import { createDrizzleClient, type DrizzleClient } from '../data/db';
+import { UserRepository } from '../data/repositories/user-repository';
+import { LockRepository } from '../data/repositories/lock-repository';
+import { MediaObjectRepository } from '../data/repositories/media-object-repository';
+import { CleanupJobRepository } from '../data/repositories/cleanup-job-repository';
+import { ManageMediaService } from '../services/manage-media-service';
+import { LockService } from '../services/lock-service';
+import { SessionTokenService } from '../services/session-token-service';
+import { OAuthUserLinkService } from '../services/oauth-user-link-service';
+import { NotificationService } from '../services/notification-service';
+import { ViewAlbumService } from '../services/view-album-service';
+import { UserAuthFlowService } from '../services/user-auth-flow-service';
+import { UserService } from '../services/user-service';
+import { ScanCounterService } from '../services/scan-counter-service';
+import { RevenueCatWebhookService } from '../services/revenuecat-webhook-service';
+import type { Logger } from './logger';
 
 export interface ServiceContainer {
   config: AppConfig;
@@ -102,17 +102,9 @@ export const createRequestContext = (
     logger
   );
 
-  const notificationService = new NotificationService(
-    userRepository,
-    firebaseClient,
-    logger
-  );
+  const notificationService = new NotificationService(userRepository, firebaseClient, logger);
 
-  const scanCounterService = new ScanCounterService(
-    lockRepository,
-    notificationService,
-    logger
-  );
+  const scanCounterService = new ScanCounterService(lockRepository, notificationService, logger);
 
   const albumService = new ViewAlbumService(
     lockRepository,

@@ -1,9 +1,9 @@
-import { UserRepository } from "../../data/repositories/user-repository";
-import { Logger } from "../../common/logger";
-import type { CreateUserRequest } from "../dtos/users";
-import type { DrizzleClient } from "../../data/db";
-import { users } from "../../data/schema";
-import { eq } from "drizzle-orm";
+import { UserRepository } from '../data/repositories/user-repository';
+import { Logger } from '../common/logger';
+import type { CreateUserRequest } from './dtos/users';
+import type { DrizzleClient } from '../data/db';
+import { users } from '../data/schema';
+import { eq } from 'drizzle-orm';
 
 export interface OAuthUserInfo {
   provider: string;
@@ -22,9 +22,15 @@ export class OAuthUserLinkService {
 
   async findOrCreate(info: OAuthUserInfo): Promise<number> {
     // Step 1: try provider mapping
-    const existingProvider = await this.userRepository.findByProvider(info.provider, info.providerId);
+    const existingProvider = await this.userRepository.findByProvider(
+      info.provider,
+      info.providerId
+    );
     if (existingProvider) {
-      this.logger.info("Found user by provider", { provider: info.provider, userId: existingProvider.id });
+      this.logger.info('Found user by provider', {
+        provider: info.provider,
+        userId: existingProvider.id,
+      });
       return existingProvider.id;
     }
 
@@ -41,19 +47,30 @@ export class OAuthUserLinkService {
         ];
 
         if (info.emailVerified) {
-          queries.push(this.db.update(users).set({ email_verified: true }).where(eq(users.id, existingByEmail.id)));
+          queries.push(
+            this.db
+              .update(users)
+              .set({ email_verified: true })
+              .where(eq(users.id, existingByEmail.id))
+          );
         }
 
         await this.db.batch(queries as any);
 
-        this.logger.info("Linked provider to existing email", { provider: info.provider, userId: existingByEmail.id });
+        this.logger.info('Linked provider to existing email', {
+          provider: info.provider,
+          userId: existingByEmail.id,
+        });
         return existingByEmail.id;
       }
     }
 
     // Step 3: create new user with compensating transaction pattern
     const createRequest: CreateUserRequest = {
-      name: info.name && info.name.trim().length > 0 ? info.name.trim() : `${capitalize(info.provider)} User`,
+      name:
+        info.name && info.name.trim().length > 0
+          ? info.name.trim()
+          : `${capitalize(info.provider)} User`,
       email: info.email ?? null,
       phoneNumber: null,
       authProvider: info.provider,
@@ -68,14 +85,19 @@ export class OAuthUserLinkService {
       const queries = [];
 
       if (info.emailVerified && createRequest.email) {
-        queries.push(this.db.update(users).set({ email_verified: true }).where(eq(users.id, created.id)));
+        queries.push(
+          this.db.update(users).set({ email_verified: true }).where(eq(users.id, created.id))
+        );
       }
 
       if (createRequest.authProvider && createRequest.providerId) {
         queries.push(
           this.db
             .update(users)
-            .set({ auth_provider: createRequest.authProvider, provider_id: createRequest.providerId })
+            .set({
+              auth_provider: createRequest.authProvider,
+              provider_id: createRequest.providerId,
+            })
             .where(eq(users.id, created.id))
         );
       }
@@ -84,15 +106,24 @@ export class OAuthUserLinkService {
         await this.db.batch(queries as any);
       }
 
-      this.logger.info("Created new external user", { provider: info.provider, userId: created.id });
+      this.logger.info('Created new external user', {
+        provider: info.provider,
+        userId: created.id,
+      });
       return created.id;
     } catch (error) {
       // Compensating transaction: delete the user if we failed to link provider
-      this.logger.error("Failed to link provider, rolling back user creation", { userId: created.id, error });
+      this.logger.error('Failed to link provider, rolling back user creation', {
+        userId: created.id,
+        error,
+      });
       try {
         await this.userRepository.delete(created.id);
       } catch (deleteError) {
-        this.logger.error("CRITICAL: Failed to delete user during rollback", { userId: created.id, deleteError });
+        this.logger.error('CRITICAL: Failed to delete user during rollback', {
+          userId: created.id,
+          deleteError,
+        });
       }
       throw error;
     }

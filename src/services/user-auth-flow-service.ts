@@ -1,11 +1,11 @@
-import { Logger } from "../../common/logger";
-import { failure, ServiceResult, success } from "../../common/result";
-import { UserRepository } from "../../data/repositories/user-repository";
-import type { TwilioVerifyClient } from "../../infrastructure/Auth/twilio";
-import type { JwtService } from "../../infrastructure/Auth/jwt";
-import type { AppleVerifier } from "../../infrastructure/Auth/oauth-apple";
-import type { GoogleVerifier } from "../../infrastructure/Auth/oauth-google";
-import type { DrizzleClient } from "../../data/db";
+import { Logger } from '../common/logger';
+import { failure, ServiceResult, success } from '../common/result';
+import { UserRepository } from '../data/repositories/user-repository';
+import type { TwilioVerifyClient } from '../infrastructure/Auth/twilio';
+import type { JwtService } from '../infrastructure/Auth/jwt';
+import type { AppleVerifier } from '../infrastructure/Auth/oauth-apple';
+import type { GoogleVerifier } from '../infrastructure/Auth/oauth-google';
+import type { DrizzleClient } from '../data/db';
 import type {
   AppleAuthRequest,
   GoogleAuthRequest,
@@ -13,14 +13,22 @@ import type {
   RefreshTokenRequest,
   SendCodeRequest,
   VerifyCodeRequest,
-} from "../dtos/users";
-import { SessionTokenService } from "./session-token-service";
-import type { OAuthUserInfo, OAuthUserLinkService } from "./oauth-user-link-service";
+} from './dtos/users';
+import { SessionTokenService } from './session-token-service';
+import type { OAuthUserInfo, OAuthUserLinkService } from './oauth-user-link-service';
 
 const normalizeEmail = (email: string) => email.trim().toLowerCase();
 
-const sanitizePhone = (phone: string) => phone.replace(/\s+/g, "");
+const sanitizePhone = (phone: string) => phone.replace(/\s+/g, '');
 
+/**
+ * Service orchestrating user authentication flows.
+ * Handles:
+ * - Phone/Email verification via Twilio
+ * - OAuth (Apple/Google) integration
+ * - Registration and Login logic
+ * - Token issuance
+ */
 export class UserAuthFlowService {
   constructor(
     private readonly db: DrizzleClient,
@@ -36,14 +44,20 @@ export class UserAuthFlowService {
 
   private ensureTwilio(): TwilioVerifyClient {
     if (!this.twilioClient) {
-      throw new Error("Twilio Verify is not configured");
+      throw new Error('Twilio Verify is not configured');
     }
     return this.twilioClient;
   }
 
-  async sendVerificationCode(request: SendCodeRequest): Promise<ServiceResult<{ userExists: boolean }>> {
+  /**
+   * Initiates verification by sending an OTP via SMS or Email.
+   * Checks if user exists to prevent account enumeration (returns success but doesn't send code if state mismatches).
+   */
+  async sendVerificationCode(
+    request: SendCodeRequest
+  ): Promise<ServiceResult<{ userExists: boolean }>> {
     if (!request.identifier || request.identifier.trim().length === 0) {
-      return failure("INVALID_IDENTIFIER", "Identifier is required", undefined, 400);
+      return failure('INVALID_IDENTIFIER', 'Identifier is required', undefined, 400);
     }
 
     const identifier = request.identifier.trim();
@@ -54,14 +68,14 @@ export class UserAuthFlowService {
     } else {
       userExists = Boolean(
         (await this.userRepository.findByPhoneNumber(identifier)) ??
-          (await this.userRepository.findByNormalizedPhoneNumber(identifier))
+        (await this.userRepository.findByNormalizedPhoneNumber(identifier))
       );
     }
 
     const shouldSendCode = (request.isLogin && userExists) || (!request.isLogin && !userExists);
     if (!shouldSendCode) {
       // Return success but do not send code to maintain original flow semantics.
-      return success({ userExists }, request.isLogin ? "User not found" : "User already exists");
+      return success({ userExists }, request.isLogin ? 'User not found' : 'User already exists');
     }
 
     try {
@@ -71,19 +85,29 @@ export class UserAuthFlowService {
         : await twilio.sendSmsVerification(identifier);
 
       if (!result) {
-        return failure("TWILIO_ERROR", "Failed to send verification code", undefined, 502);
+        return failure('TWILIO_ERROR', 'Failed to send verification code', undefined, 502);
       }
 
-      return success({ userExists }, "Verification code sent");
+      return success({ userExists }, 'Verification code sent');
     } catch (error) {
-      this.logger.error("Twilio send verification failed", { error: String(error) });
-      return failure("TWILIO_ERROR", "Failed to send verification code", undefined, 502);
+      this.logger.error('Twilio send verification failed', { error: String(error) });
+      return failure('TWILIO_ERROR', 'Failed to send verification code', undefined, 502);
     }
   }
 
+  /**
+   * Verifies the OTP and completes the authentication.
+   * - If Login: Issues tokens if user exists.
+   * - If Register: Creates user account and issues tokens.
+   */
   async verifyCode(request: VerifyCodeRequest): Promise<ServiceResult<JwtTokens>> {
     if (!request.identifier || !request.verifyCode) {
-      return failure("INVALID_REQUEST", "Identifier and verification code are required", undefined, 400);
+      return failure(
+        'INVALID_REQUEST',
+        'Identifier and verification code are required',
+        undefined,
+        400
+      );
     }
 
     const identifier = request.identifier.trim();
@@ -91,7 +115,7 @@ export class UserAuthFlowService {
 
     const verified = await twilio.verifyCode(identifier, request.verifyCode);
     if (!verified) {
-      return failure("INVALID_CODE", "Invalid verification code", undefined, 400);
+      return failure('INVALID_CODE', 'Invalid verification code', undefined, 400);
     }
 
     const isLogin = !request.name;
@@ -100,25 +124,25 @@ export class UserAuthFlowService {
       if (isLogin) {
         const user = request.isEmail
           ? await this.userRepository.findByEmailCaseInsensitive(identifier)
-          : (await this.userRepository.findByPhoneNumber(identifier)) ??
-            (await this.userRepository.findByNormalizedPhoneNumber(identifier));
+          : ((await this.userRepository.findByPhoneNumber(identifier)) ??
+            (await this.userRepository.findByNormalizedPhoneNumber(identifier)));
 
         if (!user) {
-          return failure("USER_NOT_FOUND", "User not found", undefined, 404);
+          return failure('USER_NOT_FOUND', 'User not found', undefined, 404);
         }
 
         const tokens = await this.sessionTokenService.issueTokens(user.id, {
           emailVerified: request.isEmail ? true : undefined,
           phoneVerified: request.isEmail ? undefined : true,
-          context: "Login",
+          context: 'Login',
         });
 
-        return success(tokens, "Login successful");
+        return success(tokens, 'Login successful');
       }
 
       const trimmedName = request.name?.trim();
       if (!trimmedName) {
-        return failure("INVALID_NAME", "Name is required for registration", undefined, 400);
+        return failure('INVALID_NAME', 'Name is required for registration', undefined, 400);
       }
 
       // Check for duplicates first
@@ -126,14 +150,24 @@ export class UserAuthFlowService {
         if (request.isEmail) {
           const existing = await this.userRepository.findByEmailCaseInsensitive(identifier);
           if (existing) {
-            return failure("ACCOUNT_EXISTS", "An account with this email already exists", undefined, 409);
+            return failure(
+              'ACCOUNT_EXISTS',
+              'An account with this email already exists',
+              undefined,
+              409
+            );
           }
         } else {
           const existingPhone =
             (await this.userRepository.findByPhoneNumber(identifier)) ||
             (await this.userRepository.findByNormalizedPhoneNumber(identifier));
           if (existingPhone) {
-            return failure("ACCOUNT_EXISTS", "An account with this phone number already exists", undefined, 409);
+            return failure(
+              'ACCOUNT_EXISTS',
+              'An account with this phone number already exists',
+              undefined,
+              409
+            );
           }
         }
 
@@ -142,7 +176,7 @@ export class UserAuthFlowService {
           name: trimmedName,
           email: request.isEmail ? normalizeEmail(identifier) : null,
           phoneNumber: request.isEmail ? null : sanitizePhone(identifier),
-          authProvider: "Registration",
+          authProvider: 'Registration',
           providerId: null,
           emailVerified: request.isEmail ? true : undefined,
           phoneVerified: request.isEmail ? undefined : true,
@@ -152,44 +186,49 @@ export class UserAuthFlowService {
         const tokens = await this.sessionTokenService.issueTokens(created.id, {
           emailVerified: request.isEmail ? true : undefined,
           phoneVerified: request.isEmail ? undefined : true,
-          context: "Registration",
+          context: 'Registration',
         });
 
-        return success(tokens, "Registration successful");
+        return success(tokens, 'Registration successful');
       } catch (dbError) {
         // Handle duplicate account error (from transaction)
         const errorMsg = String(dbError);
-        if (errorMsg.includes("ACCOUNT_EXISTS")) {
-          return failure("ACCOUNT_EXISTS", errorMsg.replace("ACCOUNT_EXISTS: ", ""), undefined, 409);
+        if (errorMsg.includes('ACCOUNT_EXISTS')) {
+          return failure(
+            'ACCOUNT_EXISTS',
+            errorMsg.replace('ACCOUNT_EXISTS: ', ''),
+            undefined,
+            409
+          );
         }
 
         // Log failed registration (Twilio verified but DB failed)
-        this.logger.error("Database operations failed after Twilio verification", {
+        this.logger.error('Database operations failed after Twilio verification', {
           identifier,
           error: errorMsg,
         });
 
-        return failure("REGISTRATION_FAILED", "Failed to create user account", undefined, 500);
+        return failure('REGISTRATION_FAILED', 'Failed to create user account', undefined, 500);
       }
     } catch (error) {
-      this.logger.error("Verify code flow failed", { error: String(error) });
-      return failure("VERIFY_FAILED", "Failed to process verification", undefined, 500);
+      this.logger.error('Verify code flow failed', { error: String(error) });
+      return failure('VERIFY_FAILED', 'Failed to process verification', undefined, 500);
     }
   }
 
   async refreshTokens(request: RefreshTokenRequest): Promise<ServiceResult<JwtTokens>> {
     if (!request.refreshToken) {
-      return failure("INVALID_REFRESH", "Refresh token is required", undefined, 400);
+      return failure('INVALID_REFRESH', 'Refresh token is required', undefined, 400);
     }
 
     const valid = await this.jwtService.validateRefreshToken(request.refreshToken);
     if (!valid) {
-      return failure("INVALID_REFRESH", "Invalid refresh token", undefined, 401);
+      return failure('INVALID_REFRESH', 'Invalid refresh token', undefined, 401);
     }
 
     const userId = await this.jwtService.getUserIdFromRefreshToken(request.refreshToken);
     if (!userId) {
-      return failure("INVALID_REFRESH", "Unable to resolve user for refresh token", undefined, 401);
+      return failure('INVALID_REFRESH', 'Unable to resolve user for refresh token', undefined, 401);
     }
 
     const [accessToken, refreshToken] = await Promise.all([
@@ -197,7 +236,7 @@ export class UserAuthFlowService {
       this.jwtService.generateRefreshToken(userId),
     ]);
 
-    return success({ accessToken, refreshToken, userId }, "Token refresh completed");
+    return success({ accessToken, refreshToken, userId }, 'Token refresh completed');
   }
 
   async verifyApple(request: AppleAuthRequest): Promise<ServiceResult<JwtTokens>> {
@@ -205,10 +244,13 @@ export class UserAuthFlowService {
       const appleInfo = await this.appleVerifier.verifyIdToken(request.idToken);
 
       const externalInfo: OAuthUserInfo = {
-        provider: "apple",
+        provider: 'apple',
         providerId: appleInfo.appleUserId,
         email: appleInfo.email,
-        name: request.givenName || request.familyName ? `${request.givenName ?? ""} ${request.familyName ?? ""}`.trim() : appleInfo.name,
+        name:
+          request.givenName || request.familyName
+            ? `${request.givenName ?? ''} ${request.familyName ?? ''}`.trim()
+            : appleInfo.name,
         emailVerified: appleInfo.emailVerified,
       };
 
@@ -216,13 +258,13 @@ export class UserAuthFlowService {
 
       const tokens = await this.sessionTokenService.issueTokens(userId, {
         emailVerified: appleInfo.emailVerified,
-        context: "Apple Sign-In",
+        context: 'Apple Sign-In',
       });
 
-      return success(tokens, "Apple Sign-In completed");
+      return success(tokens, 'Apple Sign-In completed');
     } catch (error) {
-      this.logger.error("Apple verification failed", { error: String(error) });
-      return failure("APPLE_VERIFY_FAILED", "Failed to verify Apple token", undefined, 400);
+      this.logger.error('Apple verification failed', { error: String(error) });
+      return failure('APPLE_VERIFY_FAILED', 'Failed to verify Apple token', undefined, 400);
     }
   }
 
@@ -231,7 +273,7 @@ export class UserAuthFlowService {
       const googleInfo = await this.googleVerifier.verifyIdToken(request.idToken);
 
       const externalInfo: OAuthUserInfo = {
-        provider: "google",
+        provider: 'google',
         providerId: googleInfo.googleUserId,
         email: googleInfo.email,
         name: googleInfo.name,
@@ -241,13 +283,13 @@ export class UserAuthFlowService {
       const userId = await this.oauthUserLinkService.findOrCreate(externalInfo);
       const tokens = await this.sessionTokenService.issueTokens(userId, {
         emailVerified: googleInfo.emailVerified,
-        context: "Google Sign-In",
+        context: 'Google Sign-In',
       });
 
-      return success(tokens, "Google Sign-In completed");
+      return success(tokens, 'Google Sign-In completed');
     } catch (error) {
-      this.logger.error("Google verification failed", { error: String(error) });
-      return failure("GOOGLE_VERIFY_FAILED", "Failed to verify Google token", undefined, 400);
+      this.logger.error('Google verification failed', { error: String(error) });
+      return failure('GOOGLE_VERIFY_FAILED', 'Failed to verify Google token', undefined, 400);
     }
   }
 }

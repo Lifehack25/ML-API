@@ -27,9 +27,9 @@ export interface PublishMetadataRequest {
 }
 
 export enum MetadataChangeType {
-  Delete = "delete",
-  Reorder = "reorder",
-  UpdateMainImage = "updateMainImage",
+  Delete = 'delete',
+  Reorder = 'reorder',
+  UpdateMainImage = 'updateMainImage',
 }
 
 export interface MetadataChange {

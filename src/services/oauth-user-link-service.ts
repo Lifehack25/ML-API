@@ -18,7 +18,7 @@ export class OAuthUserLinkService {
     private readonly db: DrizzleClient,
     private readonly userRepository: UserRepository,
     private readonly logger: Logger
-  ) {}
+  ) { }
 
   async findOrCreate(info: OAuthUserInfo): Promise<number> {
     // Step 1: try provider mapping
@@ -55,6 +55,7 @@ export class OAuthUserLinkService {
           );
         }
 
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         await this.db.batch(queries as any);
 
         this.logger.info('Linked provider to existing email', {
@@ -103,6 +104,7 @@ export class OAuthUserLinkService {
       }
 
       if (queries.length > 0) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         await this.db.batch(queries as any);
       }
 

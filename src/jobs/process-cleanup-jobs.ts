@@ -9,7 +9,7 @@ import { createDrizzleClient } from '../data/db';
  * Processes pending Cloudflare cleanup jobs with exponential backoff retry logic.
  * Runs every 12 hours via cron trigger.
  */
-export async function processCleanupJobs(env: EnvBindings, ctx: ExecutionContext): Promise<void> {
+export async function processCleanupJobs(env: EnvBindings, _ctx: ExecutionContext): Promise<void> {
   const logger = createLogger('cleanup-jobs');
   const config = loadConfig(env);
   const db = createDrizzleClient(env.DB);

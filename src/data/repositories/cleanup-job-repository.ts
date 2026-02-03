@@ -8,7 +8,7 @@ export interface CreateCleanupJobRequest {
 }
 
 export class CleanupJobRepository {
-  constructor(private readonly db: DrizzleClient) {}
+  constructor(private readonly db: DrizzleClient) { }
 
   /**
    * Schedule a new cleanup job for a Cloudflare media asset.
@@ -128,11 +128,12 @@ export class CleanupJobRepository {
         .update(cleanupJobs)
         .set({
           status: 'failed',
-          retry_count: newRetryCount,
-          last_error: error,
-          updated_at: now,
+          retry_count: sql`${cleanupJobs.retry_count} + 1`,
+          last_error: error, // Assuming 'error' is already a string, not an Error object
+          updated_at: new Date().toISOString(), // Use ISO string for consistency
         })
-        .where(eq(cleanupJobs.id, id));
+        .where(eq(cleanupJobs.id, id))
+        .returning();
     } else {
       // Schedule retry
       const nextRetryDate = new Date();
@@ -187,7 +188,7 @@ export class CleanupJobRepository {
     cutoffDate.setDate(cutoffDate.getDate() - olderThanDays);
     const cutoff = cutoffDate.toISOString();
 
-    const result = await this.db
+    await this.db
       .delete(cleanupJobs)
       .where(
         and(

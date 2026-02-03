@@ -48,6 +48,7 @@ export const requestLogger = (): MiddlewareHandler => {
     if (container?.logger) {
       container.logger.info(`${c.req.method} ${c.req.path} -> ${c.res.status} (${ms}ms)`);
     } else {
+      // eslint-disable-next-line no-console
       console.log(`${c.req.method} ${c.req.path} -> ${c.res.status} (${ms}ms)`);
     }
   };

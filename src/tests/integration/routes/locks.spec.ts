@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { buildApp } from '../../../index';
 import { mockConfig } from '../../mocks';
-import { ServiceResult, success, failure } from '../../../common/result';
+import { success } from '../../../common/result';
 
 // Define Mock Services and Repositories
 const mockLockService = {
@@ -39,9 +39,9 @@ const mockContainer = {
 
 // Mock the container/services
 vi.mock('../../../common/context', async (importOriginal) => {
-    const actual = await importOriginal();
+    const actual = await importOriginal<typeof import('../../../common/context')>();
     return {
-        ...(actual as any),
+        ...actual,
         createRequestContext: vi.fn().mockReturnValue({
             env: {},
             var: {

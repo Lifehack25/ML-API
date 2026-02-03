@@ -8,7 +8,7 @@ import type { AppConfig } from '../../config/env';
 import type { ApiError } from '../http/responses';
 import { getContainer, getUserId } from '../http/context';
 import { setUserContext, idempotencyMiddleware } from '../http/middleware';
-import { booleanQuery, requireNumericParam, validateJson } from '../http/validation';
+import { booleanQuery, validateJson } from '../http/validation';
 import type {
   AppleAuthRequest,
   RefreshTokenRequest,
@@ -68,12 +68,6 @@ const verifyIdentifierSchema = z.object({
   isEmail: z.boolean(),
   identifier: z.string().trim().min(3),
   verifyCode: z.string().trim().min(3),
-});
-
-const adminVerifyIdentifierSchema = z.object({
-  userId: z.number().int().positive(),
-  isEmail: z.boolean(),
-  identifier: z.string().trim().min(3),
 });
 
 const updateNameSchema = z.object({

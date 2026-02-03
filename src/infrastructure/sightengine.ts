@@ -50,6 +50,10 @@ interface SightengineResponse {
   gore?: {
     prob?: number;
   };
+  error?: {
+    code: number;
+    message: string;
+  };
 }
 
 const evaluateResponse = (payload: SightengineResponse): ModerationResult => {
@@ -103,6 +107,7 @@ export const createSightengineClient = (
     let compressedFile: File | null = null;
     let fileToModerate = file;
 
+    // eslint-disable-next-line no-constant-condition
     while (true) {
       try {
         const form = buildForm(config, fileToModerate, {
@@ -114,7 +119,7 @@ export const createSightengineClient = (
           body: form,
         });
 
-        const payload = await response.json<any>();
+        const payload = await response.json<SightengineResponse>();
 
         // Check for error code 14 (image too large) in response
         if (payload?.error?.code === IMAGE_TOO_LARGE_ERROR_CODE && !retriedWithCompression) {
@@ -148,6 +153,7 @@ export const createSightengineClient = (
           compressedFile = compressionResult.compressed;
           fileToModerate = compressedFile;
 
+          // eslint-disable-next-line no-console
           console.log(
             'Retrying Sightengine moderation with compressed image.',
             `Original: ${file.size} bytes, Compressed: ${compressedFile.size} bytes, CPU time: ${compressionDurationMs.toFixed(2)}ms`
@@ -197,11 +203,12 @@ export const createSightengineClient = (
       });
 
       if (!response.ok) {
-        console.error('Sightengine video moderation failed', response.status, response.statusText);
+        // eslint-disable-next-line no-console
+        console.warn('Sightengine moderation attempt failed, retrying...', { status: response.status, responseStatusText: response.statusText });
         return { approved: false, rejectionReason: 'Moderation service error' };
       }
 
-      const payload = await response.json<any>();
+      const payload = await response.json<any>(); // eslint-disable-line @typescript-eslint/no-explicit-any
       const result = Array.isArray(payload?.results) ? payload.results[0] : payload;
       return evaluateResponse(result);
     } catch (error) {

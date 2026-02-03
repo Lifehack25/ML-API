@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { buildApp } from '../../../index';
 import { mockConfig } from '../../mocks';
-import { ServiceResult, success, failure } from '../../../common/result';
+import { success, failure } from '../../../common/result';
 
 // Mock the container/services
 // We need to mock createRequestContext to return our mocked services
@@ -32,6 +32,7 @@ const mockIdempotencyService = {
 vi.mock('../../../common/context', async (importOriginal) => {
     const actual = await importOriginal();
     return {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         ...(actual as any),
         createRequestContext: vi.fn(() => ({
             services: {
@@ -49,6 +50,7 @@ vi.mock('../../../common/context', async (importOriginal) => {
 
 describe('User Routes Integration', () => {
     const app = buildApp(mockConfig);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const executionCtx = { waitUntil: vi.fn(), passThroughOnException: vi.fn() } as any;
 
     beforeEach(() => {
@@ -101,6 +103,7 @@ describe('User Routes Integration', () => {
 
             expect(res.status).toBe(400); // Service failure default status
             const body = await res.json();
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
             expect((body as any).code).toBe('INVALID_IDENTIFIER');
         });
 
@@ -130,6 +133,9 @@ describe('User Routes Integration', () => {
     describe('POST /users/verify/verify-code', () => {
         it('should return tokens on success', async () => {
             const mockTokens = { accessToken: 'acc', refreshToken: 'ref', userId: 1 };
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            mockUserService.verifyIdentifier.mockResolvedValue(success(true) as any);
             mockAuthService.verifyCode.mockResolvedValue(success(mockTokens));
 
             const res = await app.request(

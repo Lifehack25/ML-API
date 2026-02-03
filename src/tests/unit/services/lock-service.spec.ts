@@ -55,6 +55,7 @@ describe('LockService', () => {
         });
 
         it('should fail if hashedLockId decodes to nothing (invalid hash)', async () => {
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
             mockHashids.decode.mockReturnValue(null as any);
             const result = await service.connectLockToUser(1, 'invalid-hash');
             if (result.ok) throw new Error('Expected failure');
@@ -74,7 +75,9 @@ describe('LockService', () => {
 
         it('should successfully update user_id on lock', async () => {
             mockHashids.decode.mockReturnValue(123);
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
             mockLockRepo.findById.mockResolvedValue({ id: 123 } as any);
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
             mockLockRepo.update.mockResolvedValue({ id: 123, user_id: 1 } as any);
             mockHashids.encode.mockReturnValue('valid-hash');
 
@@ -96,7 +99,9 @@ describe('LockService', () => {
         });
 
         it('should set seal_date if currently null', async () => {
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
             mockLockRepo.findById.mockResolvedValue({ id: 1, seal_date: null } as any);
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
             mockLockRepo.update.mockResolvedValue({ id: 1, seal_date: '2023-01-01' } as any);
 
             const result = await service.toggleSealDate(1);
@@ -110,7 +115,9 @@ describe('LockService', () => {
         });
 
         it('should clear seal_date if currently set', async () => {
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
             mockLockRepo.findById.mockResolvedValue({ id: 1, seal_date: '2023-01-01' } as any);
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
             mockLockRepo.update.mockResolvedValue({ id: 1, seal_date: null } as any);
 
             const result = await service.toggleSealDate(1);
@@ -124,7 +131,9 @@ describe('LockService', () => {
 
     describe('updateGeoLocation', () => {
         it('should update geo location', async () => {
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
             mockLockRepo.findById.mockResolvedValue({ id: 1 } as any);
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
             mockLockRepo.update.mockResolvedValue({ id: 1, geo_location: '{"lat":10,"lng":20}' } as any);
 
             const result = await service.updateGeoLocation(1, { lat: 10, lng: 20 });

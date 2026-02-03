@@ -1,5 +1,4 @@
 import { Hono } from 'hono';
-import type { Context } from 'hono';
 import type { EnvBindings } from '../../common/bindings';
 import type { AppVariables, ServiceContainer } from '../../common/context';
 import type { ApiError } from '../http/responses';

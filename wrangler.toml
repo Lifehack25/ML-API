@@ -35,14 +35,14 @@ binding = "IMAGES"
 # Cron triggers for background jobs
 [triggers]
 crons = [
-  "0 */12 * * *"    # Every 12 hours: process Cloudflare cleanup jobs
+  "0 */12 * * *", # Every 12 hours: process Cloudflare cleanup jobs
 ]
 
 # Workers Assets for serving web album static files
 [assets]
 directory = "./web-album"
 binding = "ASSETS"
-# Exclude index.html from automatic serving - it's rendered dynamically by the Worker
+# Exclude index.html from automatic serving.
 html_handling = "none"
 
 # Routes

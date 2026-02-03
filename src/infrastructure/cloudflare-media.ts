@@ -1,5 +1,4 @@
 import { CloudflareMediaConfig } from '../config/env';
-import type { Logger } from '../common/logger';
 
 export interface CloudflareUploadResult {
   success: boolean;

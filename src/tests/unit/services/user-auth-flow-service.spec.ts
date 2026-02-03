@@ -92,6 +92,9 @@ describe('UserAuthFlowService', () => {
         });
 
         it('should return success without sending code if registration requested for existing user', async () => {
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
             vi.spyOn(mockUserRepository, 'findByEmailCaseInsensitive').mockResolvedValue({ id: 1 } as any);
 
             const result = await service.sendVerificationCode({
@@ -108,6 +111,8 @@ describe('UserAuthFlowService', () => {
         });
 
         it('should send email code for valid login request', async () => {
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
             vi.spyOn(mockUserRepository, 'findByEmailCaseInsensitive').mockResolvedValue({ id: 1 } as any);
             mockTwilio.sendEmailVerification.mockResolvedValue(true);
 
@@ -142,6 +147,8 @@ describe('UserAuthFlowService', () => {
 
         it('should login existing user successfully', async () => {
             mockTwilio.verifyCode.mockResolvedValue(true);
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
             vi.spyOn(mockUserRepository, 'findByEmailCaseInsensitive').mockResolvedValue({ id: 1 } as any);
             mockSessionTokenService.issueTokens.mockResolvedValue({
                 accessToken: 'access',
@@ -164,6 +171,7 @@ describe('UserAuthFlowService', () => {
         it('should register new user successfully', async () => {
             mockTwilio.verifyCode.mockResolvedValue(true);
             vi.spyOn(mockUserRepository, 'findByEmailCaseInsensitive').mockResolvedValue(null);
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
             vi.spyOn(mockUserRepository, 'create').mockResolvedValue({ id: 2 } as any);
             mockSessionTokenService.issueTokens.mockResolvedValue({
                 accessToken: 'access',

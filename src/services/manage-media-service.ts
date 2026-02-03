@@ -1,6 +1,5 @@
 import { Logger } from '../common/logger';
 import { failure, ServiceResult, success } from '../common/result';
-import { executeWithRetry } from '../common/retry';
 import { MediaObjectRepository } from '../data/repositories/media-object-repository';
 import type { MediaCreateRequest } from '../data/repositories/media-object-repository';
 import { LockRepository } from '../data/repositories/lock-repository';
@@ -38,7 +37,7 @@ export class ManageMediaService {
     private readonly logger: Logger,
     private readonly storageLimits: StorageLimits,
     private readonly db: DrizzleClient
-  ) {}
+  ) { }
 
   private async getValidationData(lockId: number): Promise<ValidationData> {
     const lock = await this.lockRepository.findById(lockId);
@@ -319,6 +318,7 @@ export class ManageMediaService {
       }
 
       // 2. Execute all DB operations atomically using batch API
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const batchQueries: any[] = [];
 
       // Delete media objects
@@ -366,6 +366,7 @@ export class ManageMediaService {
       }
 
       if (batchQueries.length > 0) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         await this.db.batch(batchQueries as [any, ...any[]]);
       }
 
@@ -410,7 +411,7 @@ export class ManageMediaService {
     }
   }
 
-  private async processBatchReorder(reorders: MetadataChange[], txDb?: D1Database): Promise<void> {
+  private async processBatchReorder(reorders: MetadataChange[]): Promise<void> {
     const updates = reorders.map((r) => ({
       id: r.mediaId ?? 0,
       displayOrder: r.newDisplayOrder ?? 0,

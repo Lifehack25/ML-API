@@ -26,7 +26,7 @@ export interface MediaUpdateRequest {
 }
 
 export class MediaObjectRepository {
-  constructor(private readonly db: DrizzleClient) {}
+  constructor(private readonly db: DrizzleClient) { }
 
   async findById(id: number): Promise<MediaObject | null> {
     const result = await this.db
@@ -79,6 +79,7 @@ export class MediaObjectRepository {
       const [, insertResult] = await this.db.batch([
         this.unsetMainPictureQuery(request.lock_id),
         insertQuery,
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
       ] as [any, ...any[]]);
       const created = Array.isArray(insertResult) ? insertResult[0] : null;
       if (!created) {
@@ -147,6 +148,7 @@ export class MediaObjectRepository {
       const [, updateResult] = await this.db.batch([
         this.unsetMainPictureQuery(current.lock_id),
         updateQuery,
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
       ] as [any, ...any[]]);
       const updated = Array.isArray(updateResult) ? updateResult[0] : null;
       if (!updated) {
@@ -185,6 +187,7 @@ export class MediaObjectRepository {
         .where(eq(mediaObjects.id, update.id))
     );
 
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     await this.db.batch(queries as [any, ...any[]]);
     return updates.length;
   }

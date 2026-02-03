@@ -14,7 +14,7 @@ import {
 } from './dtos/locks';
 import { ManageMediaService } from './manage-media-service';
 
-import { UNSEAL_PRODUCT_ID, STORAGE_UPGRADE_PRODUCT_ID } from './dtos/revenuecat';
+import { } from './dtos/revenuecat';
 
 const formatDateOnly = (date: Date) => date.toISOString().split('T')[0];
 
@@ -29,7 +29,7 @@ export class LockService {
     private readonly mediaService: ManageMediaService,
     private readonly hashids: HashIdHelper,
     private readonly logger: Logger
-  ) {}
+  ) { }
 
   async getUserLocks(userId: number): Promise<ServiceResult<LockSummary[]>> {
     const locks = await this.lockRepository.findByUserId(userId);
@@ -120,7 +120,7 @@ export class LockService {
       return failure('LOCK_NOT_FOUND', 'Lock not found', undefined, 404);
     }
 
-    if (Boolean(existing.upgraded_storage)) {
+    if (existing.upgraded_storage) {
       return success(mapLockRowToSummary(existing, this.hashids), 'Storage already upgraded');
     }
 

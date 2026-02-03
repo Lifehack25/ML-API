@@ -2,8 +2,11 @@ import { vi } from 'vitest';
 
 export const mockD1 = {
     prepare: vi.fn(),
-    batch: vi.fn(),
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    batched: async (_: any[]) => [],
     exec: vi.fn(),
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    batch: vi.fn(),
     dump: vi.fn(),
 } as unknown as D1Database;
 
@@ -22,6 +25,7 @@ export const mockR2 = {
 
 export const mockImages = {
     upload: vi.fn(),
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
 } as unknown as any; // Type is loosely defined for now
 
 export const mockConfig = {
@@ -33,4 +37,5 @@ export const mockConfig = {
     jwt: {
         secret: 'test-secret-key',
     },
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
 } as any;

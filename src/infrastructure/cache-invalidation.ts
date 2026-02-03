@@ -11,6 +11,7 @@ export async function invalidateAlbumCache(hashedId: string): Promise<void> {
     `https://album.memorylocks.com/?id=${hashedId}&isOwner=true`,
   ];
 
+  // eslint-disable-next-line no-console
   console.log(
     `[Cache Invalidation] Purging ${urls.length} URLs from local datacenter cache for album ${hashedId}`
   );
@@ -23,10 +24,12 @@ export async function invalidateAlbumCache(hashedId: string): Promise<void> {
     const results = await Promise.all(deletePromises);
     const deletedCount = results.filter(Boolean).length;
 
+    // eslint-disable-next-line no-console
     console.log(
       `[Cache Invalidation] Successfully purged ${deletedCount}/${urls.length} local cache entries for album ${hashedId}`
     );
   } catch (error) {
+    // eslint-disable-next-line no-console
     console.error(`[Cache Invalidation] Error purging cache for album ${hashedId}:`, error);
   }
 }

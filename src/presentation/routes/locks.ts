@@ -59,10 +59,6 @@ const updateNameSchema = z.object({
   newName: z.string().trim().min(1).max(120),
 });
 
-const upgradeBodySchema = z.object({
-  lockId: z.number().int().positive(),
-});
-
 /**
  * Creates the Hono router for Lock/Album API endpoints.
  * Includes routes for fetching, creating, updating, and publishing albums.

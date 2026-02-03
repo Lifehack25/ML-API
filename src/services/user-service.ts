@@ -28,7 +28,7 @@ export class UserService {
     private readonly cleanupJobRepository: CleanupJobRepository,
     private readonly twilioClient: TwilioVerifyClient | null,
     private readonly logger: Logger
-  ) {}
+  ) { }
 
   private ensureTwilio(): TwilioVerifyClient {
     if (!this.twilioClient) {
@@ -111,6 +111,7 @@ export class UserService {
         await this.db.batch([
           this.db.update(users).set({ email: normalized }).where(eq(users.id, request.userId)),
           this.db.update(users).set({ email_verified: true }).where(eq(users.id, request.userId)),
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
         ] as any);
       } else {
         const sanitized = sanitizePhone(identifier);
@@ -130,6 +131,7 @@ export class UserService {
             .set({ phone_number: sanitized })
             .where(eq(users.id, request.userId)),
           this.db.update(users).set({ phone_verified: true }).where(eq(users.id, request.userId)),
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
         ] as any);
       }
 
@@ -236,6 +238,7 @@ export class UserService {
       }
 
       // Execute all database deletes atomically using batch API
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const batchQueries: any[] = [];
 
       // Delete all media for each lock
@@ -253,6 +256,7 @@ export class UserService {
       batchQueries.push(this.db.delete(users).where(eq(users.id, userId)));
 
       if (batchQueries.length > 0) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         await this.db.batch(batchQueries as [any, ...any[]]);
       }
 

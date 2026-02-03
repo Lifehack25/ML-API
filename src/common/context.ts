@@ -62,6 +62,7 @@ export const createRequestContext = (
   requestId?: string,
   existingConfig?: AppConfig
 ): ServiceContainer => {
+  console.error('[DEBUG] REAL createRequestContext called');
   const config = existingConfig ?? loadConfig(env);
   const logger = createLogger(requestId);
 

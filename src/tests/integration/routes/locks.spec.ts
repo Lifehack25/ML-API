@@ -2,6 +2,13 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { buildApp } from '../../../index';
 import { mockConfig } from '../../mocks';
 import { success } from '../../../common/result';
+import { sign } from 'hono/jwt';
+import { createLogger } from '../../../common/logger';
+
+// Mock cache invalidation to prevent "caches is not defined" error in Node env
+vi.mock('../../../infrastructure/cache-invalidation', () => ({
+    invalidateAlbumCache: vi.fn(),
+}));
 
 // Define Mock Services and Repositories
 const mockLockService = {
@@ -27,6 +34,9 @@ const mockIdempotencyService = {
 };
 
 const mockContainer = {
+    // Add logger to prevent potential crashes if middleware assumes it exists (though middleware checks)
+    // and for general completeness.
+    logger: createLogger('test-req-id'),
     services: {
         locks: mockLockService,
     },
@@ -42,30 +52,21 @@ vi.mock('../../../common/context', async (importOriginal) => {
     const actual = await importOriginal<typeof import('../../../common/context')>();
     return {
         ...actual,
-        createRequestContext: vi.fn().mockReturnValue({
-            env: {},
-            var: {
-                jwtPayload: { sub: '123' }, // Authenticated User ID 123
-            },
-            get: (key: string) => {
-                if (key === 'container') return mockContainer;
-                // Some legacy tests might rely on direct service access if code was not fully using container, 
-                // but let's assume getContainer(c) is the standard now.
-                // Just in case:
-                if (key === 'config') return mockConfig;
-                if (key === 'userId') return 123; // Mocking the attached userId from middleware
-                return undefined;
-            }
-        })
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        createRequestContext: vi.fn().mockImplementation(() => mockContainer as any),
     };
 });
 
 describe('Lock Routes Integration', () => {
     let app: ReturnType<typeof buildApp>;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const executionCtx = { waitUntil: vi.fn(), passThroughOnException: vi.fn() } as any;
+    let token: string;
 
-    beforeEach(() => {
+    beforeEach(async () => {
         vi.clearAllMocks();
         app = buildApp(mockConfig);
+        token = await sign({ sub: '123', userId: 123 }, mockConfig.jwt.secret);
     });
 
     describe('POST /locks/connect/user', () => {
@@ -74,9 +75,12 @@ describe('Lock Routes Integration', () => {
 
             const response = await app.request('/locks/connect/user', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                },
                 body: JSON.stringify({ hashedLockId: 'valid-hash' })
-            });
+            }, {}, executionCtx);
 
             expect(response.status).toBe(200);
             expect(await response.json()).toEqual({ id: 1, name: 'My Lock' });
@@ -85,9 +89,12 @@ describe('Lock Routes Integration', () => {
         it('should return 400 validation error for empty hash', async () => {
             const response = await app.request('/locks/connect/user', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                },
                 body: JSON.stringify({ hashedLockId: '' })
-            });
+            }, {}, executionCtx);
             expect(response.status).toBe(400);
         });
     });
@@ -103,7 +110,8 @@ describe('Lock Routes Integration', () => {
             // 3. Request
             const response = await app.request('/locks/99/seal', {
                 method: 'PATCH',
-            });
+                headers: { 'Authorization': `Bearer ${token}` }
+            }, {}, executionCtx);
 
             expect(response.status).toBe(200);
             expect(mockLockRepository.findById).toHaveBeenCalledWith(99);
@@ -117,7 +125,8 @@ describe('Lock Routes Integration', () => {
             // 2. Request
             const response = await app.request('/locks/99/seal', {
                 method: 'PATCH',
-            });
+                headers: { 'Authorization': `Bearer ${token}` }
+            }, {}, executionCtx);
 
             expect(response.status).toBe(403);
             expect(mockLockService.toggleSealDate).not.toHaveBeenCalled();
@@ -130,7 +139,8 @@ describe('Lock Routes Integration', () => {
             // 2. Request
             const response = await app.request('/locks/99/seal', {
                 method: 'PATCH',
-            });
+                headers: { 'Authorization': `Bearer ${token}` }
+            }, {}, executionCtx);
 
             expect(response.status).toBe(404);
         });
@@ -145,13 +155,14 @@ describe('Lock Routes Integration', () => {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
-                    'Idempotency-Key': 'some-key'
+                    'Idempotency-Key': 'some-key',
+                    'Authorization': `Bearer ${token}`
                 },
                 body: JSON.stringify({
                     lockId: 99,
                     changes: []
                 })
-            });
+            }, {}, executionCtx);
 
             expect(response.status).toBe(200);
         });

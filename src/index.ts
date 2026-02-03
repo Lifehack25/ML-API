@@ -20,7 +20,7 @@ import { processCleanupJobs } from './jobs/process-cleanup-jobs';
 let appInstance: Hono<{ Bindings: EnvBindings; Variables: AppVariables }> | null = null;
 let cachedConfig: AppConfig | null = null;
 
-const buildApp = (config: AppConfig) => {
+export const buildApp = (config: AppConfig) => {
   const app = new Hono<{ Bindings: EnvBindings; Variables: AppVariables }>();
 
   app.use('*', async (c, next) => {

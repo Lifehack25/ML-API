@@ -1,8 +1,8 @@
 import { describe, it, expect, vi, beforeEach, type Mocked } from 'vitest';
-import { RevenueCatWebhookService } from '../../../../services/revenuecat-webhook-service';
-import type { LockRepository } from '../../../../data/repositories/lock-repository';
-import type { Logger } from '../../../../common/logger';
-import { UNSEAL_PRODUCT_ID, STORAGE_UPGRADE_PRODUCT_ID } from '../../../../services/dtos/revenuecat';
+import { RevenueCatWebhookService } from '../../../services/revenuecat-webhook-service';
+import type { LockRepository } from '../../../data/repositories/lock-repository';
+import type { Logger } from '../../../common/logger';
+import { UNSEAL_PRODUCT_ID, STORAGE_UPGRADE_PRODUCT_ID } from '../../../services/dtos/revenuecat';
 
 const mockLockRepo = {
     findById: vi.fn(),
@@ -36,6 +36,7 @@ describe('RevenueCatWebhookService', () => {
 
     it('should ignore non-purchase events', async () => {
         const result = await service.processWebhook(createPayload('CANCELLATION'));
+        if (!result.ok) throw new Error('Expected success');
         expect(result.ok).toBe(true);
         expect(result.message).toContain('Event type ignored');
         expect(mockLockRepo.findById).not.toHaveBeenCalled();
@@ -43,12 +44,14 @@ describe('RevenueCatWebhookService', () => {
 
     it('should fail if user ID is invalid', async () => {
         const result = await service.processWebhook(createPayload('INITIAL_PURCHASE', '1', UNSEAL_PRODUCT_ID, 'invalid'));
+        if (result.ok) throw new Error('Expected failure');
         expect(result.ok).toBe(false);
         expect(result.error.code).toBe('INVALID_USER_ID');
     });
 
     it('should fail if lock_id is missing', async () => {
         const result = await service.processWebhook(createPayload('INITIAL_PURCHASE', undefined));
+        if (result.ok) throw new Error('Expected failure');
         expect(result.ok).toBe(false);
         expect(result.error.code).toBe('MISSING_LOCK_ID');
     });
@@ -56,6 +59,7 @@ describe('RevenueCatWebhookService', () => {
     it('should fail if lock not found', async () => {
         mockLockRepo.findById.mockResolvedValue(null);
         const result = await service.processWebhook(createPayload('INITIAL_PURCHASE', '999'));
+        if (result.ok) throw new Error('Expected failure');
         expect(result.ok).toBe(false);
         expect(result.error.code).toBe('LOCK_NOT_FOUND');
     });
@@ -63,6 +67,7 @@ describe('RevenueCatWebhookService', () => {
     it('should fail if lock belongs to different user', async () => {
         mockLockRepo.findById.mockResolvedValue({ id: 999, user_id: 456 } as any);
         const result = await service.processWebhook(createPayload('INITIAL_PURCHASE', '999', UNSEAL_PRODUCT_ID, '123')); // userId 123
+        if (result.ok) throw new Error('Expected failure');
         expect(result.ok).toBe(false);
         expect(result.error.code).toBe('FORBIDDEN');
     });

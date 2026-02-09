@@ -20,74 +20,110 @@
 ## 🛠 Tech Stack
 
 -   **Runtime**: [Cloudflare Workers](https://workers.cloudflare.com/)
--   **Framework**: [Hono](https://hono.dev/)
+-   **Main Framework**: [Hono](https://hono.dev/)
 -   **Language**: [TypeScript](https://www.typescriptlang.org/)
 -   **Databases**: [Cloudflare D1](https://developers.cloudflare.com/d1/), [Cloudflare Images](https://developers.cloudflare.com/images/), [Cloudflare Stream](https://developers.cloudflare.com/stream/)
 -   **ORM**: [Drizzle ORM](https://orm.drizzle.team/)
 -   **Validation**: [Zod](https://zod.dev/)
 -   **Testing**: [Vitest](https://vitest.dev/)
 
+
+
+
 ## 🚀 Getting Started
 
 ### Prerequisites
 
--   [Node.js](https://nodejs.org/) (v20+ recommended)
--   [pnpm](https://pnpm.io/) (Package manager)
--   [Wrangler CLI](https://developers.cloudflare.com/workers/wrangler/install-and-update/) (`pnpm install -g wrangler`)
+-   [Node.js](https://nodejs.org/) (v18 or later)
+-   [npm](https://www.npmjs.com/) or [yarn](https://yarnpkg.com/)
+-   [Cloudflare Wrangler CLI](https://developers.cloudflare.com/workers/wrangler/install-and-update/) (`npm install -g wrangler`)
 
 ### Installation
 
-1.  **Clone the repository:**
+1.  Clone the repository:
     ```bash
-    git clone <repository-url>
-    cd ML-API
+    git clone https://github.com/yourusername/ml-api.git
+    cd ml-api
     ```
 
-2.  **Install dependencies:**
+2.  Install dependencies:
     ```bash
-    pnpm install
+    npm install
     ```
 
-3.  **Environment Setup:**
-    Duplicate `.dev.vars.example` (if available) to `.dev.vars` and populate the necessary secrets.
-    ```bash
-    cp .dev.vars.example .dev.vars
-    ```
-    > Note: `.dev.vars` is intentionally ignored by Git so it can safely hold local secrets. Never commit real secrets (API keys, private keys, tokens, etc.) to tracked files.
+3.  Configure your environment:
+    *   Copy `wrangler.toml.example` to `wrangler.toml`
+    *   Update `wrangler.toml` with your Cloudflare D1 Database ID and KV Namespace ID.
+    *   Create a `.dev.vars` file for local secrets (see Configuration section below).
 
-4.  **Database Setup:**
-    Generate migrations and push to the local D1 database.
-    ```bash
-    pnpm run db:generate
-    # For local development, you might need to apply migrations to a local D1 instance
-    wrangler d1 migrations apply DB --local
-    ```
+### Local Development
 
-### Running Locally
-
-Start the local development server:
+Start the development server:
 
 ```bash
-pnpm run dev
+npm run dev
 ```
 
-The API will be available at `http://localhost:8787`.
+This will invoke `wrangler dev` and allow you to test the API locally.
 
-## 📜 Scripts
+## ⚙️ Configuration
 
-| Script | Description |
-| :--- | :--- |
-| `pnpm run dev` | Start the local development server (Wrangler). |
-| `pnpm run build` | Build the worker and output to `dist` (Dry Run). |
-| `pnpm run deploy` | Deploy the worker to Cloudflare. |
-| `pnpm run test` | Run unit tests with Vitest. |
-| `pnpm run test:watch` | Run tests in watch mode. |
-| `pnpm run typecheck` | check for TypeScript errors. |
-| `pnpm run lint` | Run ESLint to check for code quality issues. |
-| `pnpm run format` | Format code using Prettier. |
-| `pnpm run db:generate` | Generate Drizzle migrations based on schema changes. |
-| `pnpm run db:check` | Check for consistency in Drizzle schema. |
+### Environment Variables
 
+The application relies on several environment variables. For local development, create a `.dev.vars` file in the root directory:
+
+```ini
+ENVIRONMENT=development
+JWT_SECRET=your_jwt_secret
+HASHIDS_SALT=your_hash_salt
+CREATE_LOCK_API_KEY=your_api_key
+PUSH_NOTIFICATION_KEY=your_push_key
+
+# Optional Integrations
+TWILIO_ACCOUNT_SID=...
+TWILIO_AUTH_TOKEN=...
+...
+```
+
+For production, set these secrets using Wrangler:
+
+```bash
+wrangler secret put JWT_SECRET
+wrangler secret put HASHIDS_SALT
+# etc...
+```
+
+### `wrangler.toml`
+
+The `wrangler.toml` file contains the Worker configuration. Use `wrangler.toml.example` as a template. You will need to provision:
+1.  **D1 Database**: `wrangler d1 create ml-api-db`
+2.  **KV Namespace**: `wrangler kv:namespace create IDEMPOTENCY_KEYS`
+
+Update the `database_id` and `id` fields in your `wrangler.toml` with the output from these commands.
+
+## 📦 Deployment
+
+To deploy to Cloudflare Workers:
+
+```bash
+npm run deploy
+```
+
+This uses `wrangler deploy` to publish your worker to the edge.
+
+## 🧪 Testing
+
+Run the test suite with Vitest:
+
+```bash
+npm test
+```
+
+To run tests in watch mode:
+
+```bash
+npm run test:watch
+```
 ## 📂 Project Structure
 
 The project follows a Clean / Layered Architecture pattern:
@@ -103,12 +139,7 @@ src/
 └── index.ts          # Application entry point & Dependency Injection
 ```
 
-## 🤝 Contributing
 
-1.  Create a feature branch (`git checkout -b feature/amazing-feature`).
-2.  Commit your changes (`git commit -m 'Add some amazing feature'`).
-3.  Push to the branch (`git push origin feature/amazing-feature`).
-4.  Open a Pull Request.
 
 ---
 

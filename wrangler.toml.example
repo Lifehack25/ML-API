@@ -19,15 +19,17 @@ persist = true
 head_sampling_rate = 1
 
 [vars]
-APPLE_BUNDLE_ID = "com.memorylocks.mlmobileapp"
+# Replace with your actual Apple Bundle ID
+APPLE_BUNDLE_ID = "com.yourdomain.appname"
 
 [[d1_databases]]
 binding = "DB"
-database_id = "3afe1cf6-4d2c-4461-9b41-1c8e232e8361"
+database_name = "ml-api-db"
+database_id = "YOUR_D1_DATABASE_ID"
 
 [[kv_namespaces]]
 binding = "IDEMPOTENCY_KEYS"
-id = "68c9b0be5f2743eba3b7394948b162e2"
+id = "YOUR_KV_NAMESPACE_ID"
 
 [images]
 binding = "IMAGES"
@@ -45,11 +47,7 @@ binding = "ASSETS"
 # Exclude index.html from automatic serving.
 html_handling = "none"
 
-# Routes
-[[routes]]
-pattern = "api.memorylocks.com/*"
-zone_name = "memorylocks.com"
-
-[[routes]]
-pattern = "album.memorylocks.com/*"
-zone_name = "memorylocks.com"
+# Routes configuration
+# [[routes]]
+# pattern = "api.yourdomain.com/*"
+# zone_name = "yourdomain.com"

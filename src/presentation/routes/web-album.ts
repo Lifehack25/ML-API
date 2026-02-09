@@ -11,7 +11,7 @@ const ALBUM_HOST = 'album.memorylocks.com';
 /**
  * Web album routes for serving HTML and static assets.
  * Serves the album viewing experience at album.memorylocks.com.
- * Handles Server-Side Rendering (SSR) of album data into the index.html template.
+ * Handles Server-Side Injection of album data and SEO meta tags into the index.html template.
  */
 export const createWebAlbumRoutes = () => {
   const router = new Hono<{ Bindings: EnvBindings; Variables: AppVariables }>();

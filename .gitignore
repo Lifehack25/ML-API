@@ -6,7 +6,7 @@ dist/
 
 # Wrangler local cache
 .wrangler/
-wrangler.toml
+# wrangler.toml
 
 # Environment files
 .env

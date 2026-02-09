@@ -1,6 +1,6 @@
 name = "ml-api"
 main = "src/index.ts"
-compatibility_date = "2024-10-01"
+compatibility_date = "2026-02-09"
 workers_dev = true
 
 [observability]
@@ -19,17 +19,15 @@ persist = true
 head_sampling_rate = 1
 
 [vars]
-# Replace with your actual Apple Bundle ID
-APPLE_BUNDLE_ID = "com.yourdomain.appname"
+APPLE_BUNDLE_ID = "com.memorylocks.mlmobileapp"
 
 [[d1_databases]]
 binding = "DB"
-database_name = "ml-api-db"
-database_id = "YOUR_D1_DATABASE_ID"
+database_id = "3afe1cf6-4d2c-4461-9b41-1c8e232e8361"
 
 [[kv_namespaces]]
 binding = "IDEMPOTENCY_KEYS"
-id = "YOUR_KV_NAMESPACE_ID"
+id = "68c9b0be5f2743eba3b7394948b162e2"
 
 [images]
 binding = "IMAGES"
@@ -47,7 +45,11 @@ binding = "ASSETS"
 # Exclude index.html from automatic serving.
 html_handling = "none"
 
-# Routes configuration
-# [[routes]]
-# pattern = "api.yourdomain.com/*"
-# zone_name = "yourdomain.com"
+# Routes
+[[routes]]
+pattern = "api.memorylocks.com/*"
+zone_name = "memorylocks.com"
+
+[[routes]]
+pattern = "album.memorylocks.com/*"
+zone_name = "memorylocks.com"

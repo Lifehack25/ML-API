@@ -9,8 +9,12 @@
 <img src="https://imagedelivery.net/Fh6D8c3CvE0G8hv20vsbkw/43379da0-d88a-42ea-fec6-7b345c7e2800/thumb" alt="Memory Locks Logo" width="200" />
 
 
-
 **Memory Locks API** is the edge-native backend service for the Memory Locks application, built on [Cloudflare Workers](https://workers.cloudflare.com/) and [Hono](https://hono.dev/). It handles user authentication, media management (images/video), and digital "locking" logic for memories.
+
+### 📱 Live Demo
+Scan the QR code to see a **Memory Locks Web Album** example, populated with media:
+
+<img src="https://imagedelivery.net/Fh6D8c3CvE0G8hv20vsbkw/05d36f7a-5478-4a92-91fd-d3c31c326100/standard" alt="Web Album" width="200" />
 
 ## ✨ Features
 
@@ -30,8 +34,6 @@
 -   **ORM**: [Drizzle ORM](https://orm.drizzle.team/)
 -   **Validation**: [Zod](https://zod.dev/)
 -   **Testing**: [Vitest](https://vitest.dev/)
-
-
 
 
 ## 🚀 Getting Started

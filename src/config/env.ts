@@ -77,6 +77,12 @@ export interface AppConfig {
   storageLimits: StorageLimits;
 }
 
+const normalizeOptionalSecret = (value?: string): string | undefined => {
+  const trimmed = value?.trim();
+  if (!trimmed) return undefined;
+  return trimmed.replace(/^['"]|['"]$/g, '');
+};
+
 export const loadConfig = (env: EnvBindings): AppConfig => {
   if (!env.JWT_SECRET) {
     throw new Error('JWT_SECRET is required');
@@ -97,11 +103,11 @@ export const loadConfig = (env: EnvBindings): AppConfig => {
     throw new Error('HASHIDS_SALT is required');
   }
 
-  const twilioConfigured = !!(
-    env.TWILIO_ACCOUNT_SID &&
-    env.TWILIO_AUTH_TOKEN &&
-    env.TWILIO_VERIFY_SERVICE_SID
-  );
+  const twilioAccountSid = normalizeOptionalSecret(env.TWILIO_ACCOUNT_SID);
+  const twilioAuthToken = normalizeOptionalSecret(env.TWILIO_AUTH_TOKEN);
+  const twilioVerifyServiceSid = normalizeOptionalSecret(env.TWILIO_VERIFY_SERVICE_SID);
+
+  const twilioConfigured = !!(twilioAccountSid && twilioAuthToken && twilioVerifyServiceSid);
   const sightengineConfigured = !!(env.SIGHTENGINE_USER && env.SIGHTENGINE_SECRET);
   const cloudflareConfigured = !!(env.CLOUDFLARE_ACCOUNT_ID && env.CLOUDFLARE_UPLOAD_TOKEN);
   const appleConfigured = !!(
@@ -126,9 +132,9 @@ export const loadConfig = (env: EnvBindings): AppConfig => {
     },
     twilio: twilioConfigured
       ? {
-          accountSid: env.TWILIO_ACCOUNT_SID!,
-          authToken: env.TWILIO_AUTH_TOKEN!,
-          verifyServiceSid: env.TWILIO_VERIFY_SERVICE_SID!,
+          accountSid: twilioAccountSid!,
+          authToken: twilioAuthToken!,
+          verifyServiceSid: twilioVerifyServiceSid!,
         }
       : undefined,
     sightengine: sightengineConfigured

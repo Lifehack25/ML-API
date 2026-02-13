@@ -15,9 +15,17 @@ import type {
   UserProfile,
   VerifyIdentifierRequest,
 } from './dtos/users';
-import type { TwilioVerifyClient } from '../infrastructure/Auth/twilio';
+import {
+  isTwilioRequestError,
+  type TwilioVerifyClient,
+} from '../infrastructure/Auth/twilio';
 
 const sanitizePhone = (phone: string) => phone.replace(/\s+/g, '');
+const mapTwilioStatus = (status: number): 400 | 429 | 502 => {
+  if (status === 429) return 429;
+  if (status >= 500) return 502;
+  return 400;
+};
 
 export class UserService {
   constructor(
@@ -93,9 +101,34 @@ export class UserService {
 
     const twilio = this.ensureTwilio();
     const identifier = request.identifier.trim();
-    const verified = await twilio.verifyCode(identifier, request.verifyCode);
-    if (!verified) {
-      return failure('INVALID_CODE', 'Invalid verification code', undefined, 400);
+    let verified = false;
+
+    try {
+      verified = await twilio.verifyCode(identifier, request.verifyCode);
+      if (!verified) {
+        return failure('INVALID_CODE', 'Invalid verification code', undefined, 400);
+      }
+    } catch (error) {
+      if (isTwilioRequestError(error)) {
+        this.logger.error('Twilio verification check failed', {
+          httpStatus: error.httpStatus,
+          twilioCode: error.twilioCode,
+          twilioMessage: error.twilioMessage,
+          moreInfo: error.moreInfo,
+        });
+        return failure(
+          'TWILIO_ERROR',
+          error.twilioMessage || 'Failed to verify code',
+          {
+            twilioCode: error.twilioCode,
+            moreInfo: error.moreInfo,
+          },
+          mapTwilioStatus(error.httpStatus)
+        );
+      }
+
+      this.logger.error('Twilio verification check failed', { error: String(error) });
+      return failure('TWILIO_ERROR', 'Failed to verify code', undefined, 502);
     }
 
     try {
@@ -302,6 +335,24 @@ export class UserService {
       }
       return success(true, 'Verification code sent');
     } catch (error) {
+      if (isTwilioRequestError(error)) {
+        this.logger.error('Resend verification failed', {
+          httpStatus: error.httpStatus,
+          twilioCode: error.twilioCode,
+          twilioMessage: error.twilioMessage,
+          moreInfo: error.moreInfo,
+        });
+        return failure(
+          'TWILIO_ERROR',
+          error.twilioMessage || 'Failed to send verification code',
+          {
+            twilioCode: error.twilioCode,
+            moreInfo: error.moreInfo,
+          },
+          mapTwilioStatus(error.httpStatus)
+        );
+      }
+
       this.logger.error('Resend verification failed', { error: String(error) });
       return failure('TWILIO_ERROR', 'Failed to send verification code', undefined, 502);
     }

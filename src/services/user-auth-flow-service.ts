@@ -1,7 +1,10 @@
 import { Logger } from '../common/logger';
 import { failure, ServiceResult, success } from '../common/result';
 import { UserRepository } from '../data/repositories/user-repository';
-import type { TwilioVerifyClient } from '../infrastructure/Auth/twilio';
+import {
+  isTwilioRequestError,
+  type TwilioVerifyClient,
+} from '../infrastructure/Auth/twilio';
 import type { JwtService } from '../infrastructure/Auth/jwt';
 import type { AppleVerifier } from '../infrastructure/Auth/oauth-apple';
 import type { GoogleVerifier } from '../infrastructure/Auth/oauth-google';
@@ -20,6 +23,12 @@ import type { OAuthUserInfo, OAuthUserLinkService } from './oauth-user-link-serv
 const normalizeEmail = (email: string) => email.trim().toLowerCase();
 
 const sanitizePhone = (phone: string) => phone.replace(/\s+/g, '');
+
+const mapTwilioStatus = (status: number): 400 | 429 | 502 => {
+  if (status === 429) return 429;
+  if (status >= 500) return 502;
+  return 400;
+};
 
 /**
  * Service orchestrating user authentication flows.
@@ -90,6 +99,24 @@ export class UserAuthFlowService {
 
       return success({ userExists }, 'Verification code sent');
     } catch (error) {
+      if (isTwilioRequestError(error)) {
+        this.logger.error('Twilio send verification failed', {
+          httpStatus: error.httpStatus,
+          twilioCode: error.twilioCode,
+          twilioMessage: error.twilioMessage,
+          moreInfo: error.moreInfo,
+        });
+        return failure(
+          'TWILIO_ERROR',
+          error.twilioMessage || 'Failed to send verification code',
+          {
+            twilioCode: error.twilioCode,
+            moreInfo: error.moreInfo,
+          },
+          mapTwilioStatus(error.httpStatus)
+        );
+      }
+
       this.logger.error('Twilio send verification failed', { error: String(error) });
       return failure('TWILIO_ERROR', 'Failed to send verification code', undefined, 502);
     }
@@ -112,10 +139,34 @@ export class UserAuthFlowService {
 
     const identifier = request.identifier.trim();
     const twilio = this.ensureTwilio();
+    let verified = false;
 
-    const verified = await twilio.verifyCode(identifier, request.verifyCode);
-    if (!verified) {
-      return failure('INVALID_CODE', 'Invalid verification code', undefined, 400);
+    try {
+      verified = await twilio.verifyCode(identifier, request.verifyCode);
+      if (!verified) {
+        return failure('INVALID_CODE', 'Invalid verification code', undefined, 400);
+      }
+    } catch (error) {
+      if (isTwilioRequestError(error)) {
+        this.logger.error('Twilio verification check failed', {
+          httpStatus: error.httpStatus,
+          twilioCode: error.twilioCode,
+          twilioMessage: error.twilioMessage,
+          moreInfo: error.moreInfo,
+        });
+        return failure(
+          'TWILIO_ERROR',
+          error.twilioMessage || 'Failed to verify code',
+          {
+            twilioCode: error.twilioCode,
+            moreInfo: error.moreInfo,
+          },
+          mapTwilioStatus(error.httpStatus)
+        );
+      }
+
+      this.logger.error('Twilio verification check failed', { error: String(error) });
+      return failure('TWILIO_ERROR', 'Failed to verify code', undefined, 502);
     }
 
     const isLogin = !request.name;

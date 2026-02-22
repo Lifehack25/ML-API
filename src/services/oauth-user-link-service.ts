@@ -18,7 +18,7 @@ export class OAuthUserLinkService {
     private readonly db: DrizzleClient,
     private readonly userRepository: UserRepository,
     private readonly logger: Logger
-  ) { }
+  ) {}
 
   async findOrCreate(info: OAuthUserInfo): Promise<number> {
     // Step 1: try provider mapping

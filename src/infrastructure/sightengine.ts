@@ -204,7 +204,10 @@ export const createSightengineClient = (
 
       if (!response.ok) {
         // eslint-disable-next-line no-console
-        console.warn('Sightengine moderation attempt failed, retrying...', { status: response.status, responseStatusText: response.statusText });
+        console.warn('Sightengine moderation attempt failed, retrying...', {
+          status: response.status,
+          responseStatusText: response.statusText,
+        });
         return { approved: false, rejectionReason: 'Moderation service error' };
       }
 

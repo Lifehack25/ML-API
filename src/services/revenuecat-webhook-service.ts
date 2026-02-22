@@ -8,7 +8,7 @@ export class RevenueCatWebhookService {
   constructor(
     private readonly lockRepository: LockRepository,
     private readonly logger: Logger
-  ) { }
+  ) {}
 
   async processWebhook(payload: RevenueCatWebhookPayload): Promise<ServiceResult<void>> {
     try {

@@ -1,8 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import {
-  createTwilioVerifyClient,
-  TwilioRequestError,
-} from '../../../infrastructure/Auth/twilio';
+import { createTwilioVerifyClient, TwilioRequestError } from '../../../infrastructure/Auth/twilio';
 
 describe('Twilio verify client', () => {
   const originalFetch = globalThis.fetch;
@@ -38,7 +35,7 @@ describe('Twilio verify client', () => {
       'https://verify.twilio.com/v2/Services/VA_TEST_VERIFY_SERVICE_SID/Verifications'
     );
     expect(init.method).toBe('POST');
-    expect(init.body).toBe('to=%2B46739503820&channel=sms');
+    expect(init.body).toBe('To=%2B46739503820&Channel=sms');
     expect((init.headers as Record<string, string>).Authorization).toMatch(/^Basic /);
   });
 

@@ -26,7 +26,7 @@ export interface MediaUpdateRequest {
 }
 
 export class MediaObjectRepository {
-  constructor(private readonly db: DrizzleClient) { }
+  constructor(private readonly db: DrizzleClient) {}
 
   async findById(id: number): Promise<MediaObject | null> {
     const result = await this.db

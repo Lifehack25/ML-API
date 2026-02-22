@@ -16,6 +16,8 @@ import { createWebAlbumRoutes } from './presentation/routes/web-album';
 import { createPushNotificationRoutes } from './presentation/routes/pushNotifications';
 import { createRevenueCatRoutes } from './presentation/routes/revenuecat';
 import { processCleanupJobs } from './jobs/process-cleanup-jobs';
+import { IdempotencyService } from './infrastructure/idempotency';
+import { createDrizzleClient } from './data/db';
 
 let appInstance: Hono<{ Bindings: EnvBindings; Variables: AppVariables }> | null = null;
 let cachedConfig: AppConfig | null = null;
@@ -101,6 +103,11 @@ export default {
       if (event.cron === '0 */12 * * *') {
         // Every 12 hours: process Cloudflare cleanup jobs
         await processCleanupJobs(env, ctx);
+      } else if (event.cron === '0 3 * * *') {
+        // Every day at 3 AM UTC: process Idempotency Keys cleanup
+        const db = createDrizzleClient(env.DB);
+        const idempotencyService = new IdempotencyService(db);
+        await idempotencyService.deleteOldKeys();
       }
     } catch (error) {
       console.error('Scheduled job failed', { cron: event.cron, error: String(error) });

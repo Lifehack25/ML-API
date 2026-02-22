@@ -1,10 +1,7 @@
 import { Logger } from '../common/logger';
 import { failure, ServiceResult, success } from '../common/result';
 import { UserRepository } from '../data/repositories/user-repository';
-import {
-  isTwilioRequestError,
-  type TwilioVerifyClient,
-} from '../infrastructure/Auth/twilio';
+import { isTwilioRequestError, type TwilioVerifyClient } from '../infrastructure/Auth/twilio';
 import type { JwtService } from '../infrastructure/Auth/jwt';
 import type { AppleVerifier } from '../infrastructure/Auth/oauth-apple';
 import type { GoogleVerifier } from '../infrastructure/Auth/oauth-google';

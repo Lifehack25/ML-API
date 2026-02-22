@@ -15,6 +15,13 @@
       "when": 1766075660398,
       "tag": "0001_lively_winter_soldier",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1771792368617,
+      "tag": "0002_cold_hellfire_club",
+      "breakpoints": true
     }
   ]
 }

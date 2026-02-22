@@ -8,7 +8,7 @@ export interface CreateCleanupJobRequest {
 }
 
 export class CleanupJobRepository {
-  constructor(private readonly db: DrizzleClient) { }
+  constructor(private readonly db: DrizzleClient) {}
 
   /**
    * Schedule a new cleanup job for a Cloudflare media asset.

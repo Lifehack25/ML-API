@@ -37,7 +37,7 @@ export class ManageMediaService {
     private readonly logger: Logger,
     private readonly storageLimits: StorageLimits,
     private readonly db: DrizzleClient
-  ) { }
+  ) {}
 
   private async getValidationData(lockId: number): Promise<ValidationData> {
     const lock = await this.lockRepository.findById(lockId);

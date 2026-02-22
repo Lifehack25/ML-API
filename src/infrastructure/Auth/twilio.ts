@@ -91,8 +91,8 @@ export const createTwilioVerifyClient = (config: TwilioConfig): TwilioVerifyClie
 
   const sendVerification = async (to: string, channel: 'sms' | 'email'): Promise<boolean> => {
     const response = await request('/Verifications', {
-      to,
-      channel,
+      To: to,
+      Channel: channel,
     });
 
     const payload = await response.json<{ status?: string }>().catch(() => ({ status: undefined }));
@@ -104,8 +104,8 @@ export const createTwilioVerifyClient = (config: TwilioConfig): TwilioVerifyClie
     sendSmsVerification: (to) => sendVerification(to, 'sms'),
     verifyCode: async (to, code) => {
       const response = await request('/VerificationCheck', {
-        to,
-        code,
+        To: to,
+        Code: code,
       });
 
       const payload = await response

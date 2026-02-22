@@ -28,12 +28,11 @@
  * ```
  */
 
-export interface CachedResponse {
-  status: number;
-  body: unknown;
-}
+import { eq, lt } from 'drizzle-orm';
+import type { DrizzleClient } from '../data/db';
+import { idempotencyKeys } from '../data/schema';
 
-interface StoredValue {
+export interface CachedResponse {
   status: number;
   body: unknown;
 }
@@ -41,26 +40,39 @@ interface StoredValue {
 export class IdempotencyService {
   private static readonly TTL_SECONDS = 900; // 15 minutes
 
-  constructor(private kv: KVNamespace) {}
+  constructor(private db: DrizzleClient) {}
 
   /**
    * Check if an idempotency key already exists and return cached response if found.
    *
    * @param key - Idempotency key (UUID or client-supplied)
    * @param endpoint - Request endpoint path
-   * @returns Cached response if key exists, null otherwise
+   * @returns Cached response if key exists and is valid, null otherwise
    */
   async checkIdempotency(key: string, endpoint: string): Promise<CachedResponse | null> {
-    const kvKey = this.buildKvKey(key, endpoint);
-    const cached = await this.kv.get<StoredValue>(kvKey, 'json');
+    const dbKey = this.buildKey(key, endpoint);
+
+    const [cached] = await this.db
+      .select()
+      .from(idempotencyKeys)
+      .where(eq(idempotencyKeys.key, dbKey))
+      .limit(1);
 
     if (!cached) {
       return null;
     }
 
+    // Check if the key has expired (older than 15 minutes)
+    // created_at is strictly in ISO8601 UTC format
+    const createdAtTime = new Date(cached.created_at + 'Z').getTime();
+    if (Date.now() - createdAtTime > IdempotencyService.TTL_SECONDS * 1000) {
+      // Expired, let's treat it as not found
+      return null;
+    }
+
     return {
       status: cached.status,
-      body: cached.body,
+      body: cached.body ? JSON.parse(cached.body) : null,
     };
   }
 
@@ -73,12 +85,26 @@ export class IdempotencyService {
    * @param body - Response body
    */
   async storeResult(key: string, endpoint: string, status: number, body: unknown): Promise<void> {
-    const kvKey = this.buildKvKey(key, endpoint);
-    const value: StoredValue = { status, body };
+    const dbKey = this.buildKey(key, endpoint);
 
-    await this.kv.put(kvKey, JSON.stringify(value), {
-      expirationTtl: IdempotencyService.TTL_SECONDS,
-    });
+    try {
+      await this.db
+        .insert(idempotencyKeys)
+        .values({
+          key: dbKey,
+          status,
+          body: JSON.stringify(body),
+        })
+        .onConflictDoUpdate({
+          target: idempotencyKeys.key,
+          set: {
+            status,
+            body: JSON.stringify(body),
+          },
+        });
+    } catch (e) {
+      console.error('Failed to store idempotency result in D1', e);
+    }
   }
 
   /**
@@ -88,19 +114,31 @@ export class IdempotencyService {
    * @param endpoint - Request endpoint path
    */
   async deleteKey(key: string, endpoint: string): Promise<void> {
-    const kvKey = this.buildKvKey(key, endpoint);
-    await this.kv.delete(kvKey);
+    const dbKey = this.buildKey(key, endpoint);
+    await this.db.delete(idempotencyKeys).where(eq(idempotencyKeys.key, dbKey));
   }
 
   /**
-   * Build KV key from idempotency key and endpoint.
+   * Delete keys older than a specific threshold (e.g. 24 hours).
+   * Intended to be run periodically via a Cron Trigger.
+   */
+  async deleteOldKeys(maxAgeSeconds: number = 24 * 60 * 60): Promise<void> {
+    const thresholdDate = new Date(Date.now() - maxAgeSeconds * 1000);
+    // SQLite uses 'YYYY-MM-DD HH:MM:SS' format for CURRENT_TIMESTAMP
+    const thresholdSqlString = thresholdDate.toISOString().replace('T', ' ').substring(0, 19);
+
+    await this.db.delete(idempotencyKeys).where(lt(idempotencyKeys.created_at, thresholdSqlString));
+  }
+
+  /**
+   * Build database key from idempotency key and endpoint.
    * Format: idempotency:{endpoint}:{key}
    *
    * @param key - Idempotency key
    * @param endpoint - Request endpoint path
-   * @returns KV key string
+   * @returns DB key string
    */
-  private buildKvKey(key: string, endpoint: string): string {
+  private buildKey(key: string, endpoint: string): string {
     // Normalize endpoint by removing leading slash and replacing slashes with colons
     const normalizedEndpoint = endpoint.replace(/^\//, '').replace(/\//g, ':');
     return `idempotency:${normalizedEndpoint}:${key}`;

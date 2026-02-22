@@ -15,10 +15,7 @@ import type {
   UserProfile,
   VerifyIdentifierRequest,
 } from './dtos/users';
-import {
-  isTwilioRequestError,
-  type TwilioVerifyClient,
-} from '../infrastructure/Auth/twilio';
+import { isTwilioRequestError, type TwilioVerifyClient } from '../infrastructure/Auth/twilio';
 
 const sanitizePhone = (phone: string) => phone.replace(/\s+/g, '');
 const mapTwilioStatus = (status: number): 400 | 429 | 502 => {
@@ -36,7 +33,7 @@ export class UserService {
     private readonly cleanupJobRepository: CleanupJobRepository,
     private readonly twilioClient: TwilioVerifyClient | null,
     private readonly logger: Logger
-  ) { }
+  ) {}
 
   private ensureTwilio(): TwilioVerifyClient {
     if (!this.twilioClient) {

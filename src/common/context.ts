@@ -82,7 +82,7 @@ export const createRequestContext = (
   const cleanupJobRepository = new CleanupJobRepository(db);
 
   const hashHelper = createHashIdHelper(config.hashids);
-  const idempotencyService = new IdempotencyService(env.IDEMPOTENCY_KEYS);
+  const idempotencyService = new IdempotencyService(db);
 
   const mediaService = new ManageMediaService(
     mediaRepository,

@@ -14,7 +14,7 @@ import {
 } from './dtos/locks';
 import { ManageMediaService } from './manage-media-service';
 
-import { } from './dtos/revenuecat';
+import {} from './dtos/revenuecat';
 
 const formatDateOnly = (date: Date) => date.toISOString().split('T')[0];
 
@@ -29,7 +29,7 @@ export class LockService {
     private readonly mediaService: ManageMediaService,
     private readonly hashids: HashIdHelper,
     private readonly logger: Logger
-  ) { }
+  ) {}
 
   async getUserLocks(userId: number): Promise<ServiceResult<LockSummary[]>> {
     const locks = await this.lockRepository.findByUserId(userId);

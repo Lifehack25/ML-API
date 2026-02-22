@@ -23,11 +23,10 @@ APPLE_BUNDLE_ID = "com.memorylocks.mlmobileapp"
 
 [[d1_databases]]
 binding = "DB"
+database_name = "ML-Database"
 database_id = "3afe1cf6-4d2c-4461-9b41-1c8e232e8361"
+migrations_dir = "drizzle/migrations"
 
-[[kv_namespaces]]
-binding = "IDEMPOTENCY_KEYS"
-id = "68c9b0be5f2743eba3b7394948b162e2"
 
 [images]
 binding = "IMAGES"
@@ -36,6 +35,7 @@ binding = "IMAGES"
 [triggers]
 crons = [
   "0 */12 * * *", # Every 12 hours: process Cloudflare cleanup jobs
+  "0 3 * * *",    # Every day at 3 AM UTC: process Idempotency Keys cleanup
 ]
 
 # Workers Assets for serving web album static files

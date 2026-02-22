@@ -48,7 +48,7 @@ export class UserAuthFlowService {
     private readonly googleVerifier: GoogleVerifier,
     private readonly mailerLiteClient: MailerLiteClient | null,
     private readonly logger: Logger
-  ) {}
+  ) { }
 
   private ensureTwilio(): TwilioVerifyClient {
     if (!this.twilioClient) {
@@ -126,7 +126,10 @@ export class UserAuthFlowService {
    * - If Login: Issues tokens if user exists.
    * - If Register: Creates user account and issues tokens.
    */
-  async verifyCode(request: VerifyCodeRequest): Promise<ServiceResult<JwtTokens>> {
+  async verifyCode(
+    request: VerifyCodeRequest,
+    executionCtx?: ExecutionContext
+  ): Promise<ServiceResult<JwtTokens>> {
     if (!request.identifier || !request.verifyCode) {
       return failure(
         'INVALID_REQUEST',
@@ -242,9 +245,13 @@ export class UserAuthFlowService {
         // Add to MailerLite if email is provided
         if (request.isEmail && created.email && this.mailerLiteClient) {
           const groupId = '180116868106814872';
-          this.mailerLiteClient.addSubscriber(created.email, created.name, groupId).catch((e) => {
+          const promise = this.mailerLiteClient.addSubscriber(created.email, created.name, groupId).catch((e) => {
             this.logger.error('Failed to add user to MailerLite', { error: String(e) });
           });
+
+          if (executionCtx) {
+            executionCtx.waitUntil(promise);
+          }
         }
 
         return success(tokens, 'Registration successful');
@@ -297,7 +304,10 @@ export class UserAuthFlowService {
     return success({ accessToken, refreshToken, userId }, 'Token refresh completed');
   }
 
-  async verifyApple(request: AppleAuthRequest): Promise<ServiceResult<JwtTokens>> {
+  async verifyApple(
+    request: AppleAuthRequest,
+    executionCtx?: ExecutionContext
+  ): Promise<ServiceResult<JwtTokens>> {
     try {
       const appleInfo = await this.appleVerifier.verifyIdToken(request.idToken);
 
@@ -312,7 +322,7 @@ export class UserAuthFlowService {
         emailVerified: appleInfo.emailVerified,
       };
 
-      const userId = await this.oauthUserLinkService.findOrCreate(externalInfo);
+      const userId = await this.oauthUserLinkService.findOrCreate(externalInfo, executionCtx);
 
       const tokens = await this.sessionTokenService.issueTokens(userId, {
         emailVerified: appleInfo.emailVerified,
@@ -326,7 +336,10 @@ export class UserAuthFlowService {
     }
   }
 
-  async verifyGoogle(request: GoogleAuthRequest): Promise<ServiceResult<JwtTokens>> {
+  async verifyGoogle(
+    request: GoogleAuthRequest,
+    executionCtx?: ExecutionContext
+  ): Promise<ServiceResult<JwtTokens>> {
     try {
       const googleInfo = await this.googleVerifier.verifyIdToken(request.idToken);
 
@@ -338,7 +351,7 @@ export class UserAuthFlowService {
         emailVerified: googleInfo.emailVerified,
       };
 
-      const userId = await this.oauthUserLinkService.findOrCreate(externalInfo);
+      const userId = await this.oauthUserLinkService.findOrCreate(externalInfo, executionCtx);
       const tokens = await this.sessionTokenService.issueTokens(userId, {
         emailVerified: googleInfo.emailVerified,
         context: 'Google Sign-In',

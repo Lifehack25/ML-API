@@ -124,7 +124,7 @@ export const createUserRoutes = (config: AppConfig) => {
     validateJson(verifyCodeSchema),
     async (c) => {
       const payload = c.req.valid('json') as VerifyCodeRequest;
-      const result = await getService(c).services.auth.verifyCode(payload);
+      const result = await getService(c).services.auth.verifyCode(payload, c.executionCtx);
       if (result.ok) {
         return c.json(result.data, result.status ?? 200);
       }
@@ -159,7 +159,7 @@ export const createUserRoutes = (config: AppConfig) => {
     validateJson(appleSchema),
     async (c) => {
       const payload = c.req.valid('json') as AppleAuthRequest;
-      const result = await getService(c).services.auth.verifyApple(payload);
+      const result = await getService(c).services.auth.verifyApple(payload, c.executionCtx);
       if (result.ok) {
         return c.json(result.data, result.status ?? 200);
       }
@@ -179,7 +179,7 @@ export const createUserRoutes = (config: AppConfig) => {
     validateJson(googleSchema),
     async (c) => {
       const payload = c.req.valid('json') as { idToken: string };
-      const result = await getService(c).services.auth.verifyGoogle(payload);
+      const result = await getService(c).services.auth.verifyGoogle(payload, c.executionCtx);
       if (result.ok) {
         return c.json(result.data, result.status ?? 200);
       }

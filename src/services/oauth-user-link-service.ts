@@ -20,9 +20,9 @@ export class OAuthUserLinkService {
     private readonly userRepository: UserRepository,
     private readonly mailerLiteClient: MailerLiteClient | null,
     private readonly logger: Logger
-  ) {}
+  ) { }
 
-  async findOrCreate(info: OAuthUserInfo): Promise<number> {
+  async findOrCreate(info: OAuthUserInfo, executionCtx?: ExecutionContext): Promise<number> {
     // Step 1: try provider mapping
     const existingProvider = await this.userRepository.findByProvider(
       info.provider,
@@ -116,13 +116,16 @@ export class OAuthUserLinkService {
       });
 
       if (createRequest.email && this.mailerLiteClient) {
-        // Fire and forget, no await
         const groupId = '180116868106814872';
-        this.mailerLiteClient
+        const promise = this.mailerLiteClient
           .addSubscriber(createRequest.email, createRequest.name, groupId)
           .catch((e) => {
             this.logger.error('Failed to add OAuth user to MailerLite', { error: String(e) });
           });
+
+        if (executionCtx) {
+          executionCtx.waitUntil(promise);
+        }
       }
 
       return created.id;

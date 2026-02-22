@@ -4,6 +4,7 @@ import type { CreateUserRequest } from './dtos/users';
 import type { DrizzleClient } from '../data/db';
 import { users } from '../data/schema';
 import { eq } from 'drizzle-orm';
+import type { MailerLiteClient } from '../infrastructure/mailerlite';
 
 export interface OAuthUserInfo {
   provider: string;
@@ -17,6 +18,7 @@ export class OAuthUserLinkService {
   constructor(
     private readonly db: DrizzleClient,
     private readonly userRepository: UserRepository,
+    private readonly mailerLiteClient: MailerLiteClient | null,
     private readonly logger: Logger
   ) {}
 
@@ -112,6 +114,17 @@ export class OAuthUserLinkService {
         provider: info.provider,
         userId: created.id,
       });
+
+      if (createRequest.email && this.mailerLiteClient) {
+        // Fire and forget, no await
+        const groupId = '180116868106814872';
+        this.mailerLiteClient
+          .addSubscriber(createRequest.email, createRequest.name, groupId)
+          .catch((e) => {
+            this.logger.error('Failed to add OAuth user to MailerLite', { error: String(e) });
+          });
+      }
+
       return created.id;
     } catch (error) {
       // Compensating transaction: delete the user if we failed to link provider

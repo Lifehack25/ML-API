@@ -57,6 +57,10 @@ export interface StorageLimits {
   maxVideoSizeMB: number;
 }
 
+export interface MailerLiteConfig {
+  apiKey: string;
+}
+
 /**
  * Main application configuration object.
  * Loaded from environment variables (bindings) at runtime.
@@ -71,6 +75,7 @@ export interface AppConfig {
   apple?: AppleConfig;
   google: GoogleConfig;
   revenueCat?: RevenueCatConfig;
+  mailerLite?: MailerLiteConfig;
   createLockApiKey: string;
   pushNotificationKey: string;
   environment: string;
@@ -117,6 +122,7 @@ export const loadConfig = (env: EnvBindings): AppConfig => {
     env.APPLE_AUTH_KEY_PEM
   );
   const revenueCatConfigured = !!env.REVENUECAT_WEBHOOK_AUTH_KEY;
+  const mailerLiteConfigured = !!env.MAILERLITE_API_TOKEN;
 
   return {
     jwt: {
@@ -167,6 +173,11 @@ export const loadConfig = (env: EnvBindings): AppConfig => {
     revenueCat: revenueCatConfigured
       ? {
           webhookAuthKey: env.REVENUECAT_WEBHOOK_AUTH_KEY!,
+        }
+      : undefined,
+    mailerLite: mailerLiteConfigured
+      ? {
+          apiKey: env.MAILERLITE_API_TOKEN!,
         }
       : undefined,
     storageLimits: {

@@ -39,6 +39,9 @@ export interface EnvBindings {
 
   // Environment
   ENVIRONMENT?: string;
+
+  // MailerLite
+  MAILERLITE_API_TOKEN?: string;
 }
 
 export type AppContext = {

@@ -9,6 +9,7 @@ import { createFirebaseMessagingClient } from '../infrastructure/firebase';
 import { createAppleVerifier } from '../infrastructure/Auth/oauth-apple';
 import { createGoogleVerifier } from '../infrastructure/Auth/oauth-google';
 import { createJwtService } from '../infrastructure/Auth/jwt';
+import { createMailerLiteClient } from '../infrastructure/mailerlite';
 import { IdempotencyService } from '../infrastructure/idempotency';
 import { createDrizzleClient, type DrizzleClient } from '../data/db';
 import { UserRepository } from '../data/repositories/user-repository';
@@ -62,7 +63,6 @@ export const createRequestContext = (
   requestId?: string,
   existingConfig?: AppConfig
 ): ServiceContainer => {
-  console.error('[DEBUG] REAL createRequestContext called');
   const config = existingConfig ?? loadConfig(env);
   const logger = createLogger(requestId);
 
@@ -73,6 +73,9 @@ export const createRequestContext = (
   const appleVerifier = createAppleVerifier(config.apple);
   const googleVerifier = createGoogleVerifier(config.google);
   const jwtService = createJwtService(config.jwt);
+  const mailerLiteClient = config.mailerLite
+    ? createMailerLiteClient(config.mailerLite, logger)
+    : null;
 
   const db = createDrizzleClient(env.DB);
 
@@ -116,7 +119,12 @@ export const createRequestContext = (
   );
 
   const sessionTokenService = new SessionTokenService(jwtService, userRepository, logger);
-  const oauthUserLinkService = new OAuthUserLinkService(db, userRepository, logger);
+  const oauthUserLinkService = new OAuthUserLinkService(
+    db,
+    userRepository,
+    mailerLiteClient,
+    logger
+  );
 
   const authService = new UserAuthFlowService(
     db,
@@ -127,6 +135,7 @@ export const createRequestContext = (
     oauthUserLinkService,
     appleVerifier,
     googleVerifier,
+    mailerLiteClient,
     logger
   );
 

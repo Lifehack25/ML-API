@@ -9,6 +9,8 @@ import type { AppleVerifier } from '../../../infrastructure/Auth/oauth-apple';
 import type { GoogleVerifier } from '../../../infrastructure/Auth/oauth-google';
 import type { DrizzleClient } from '../../../data/db';
 import type { Logger } from '../../../common/logger';
+import type { User } from '../../../data/schema';
+import type { MailerLiteClient } from '../../../infrastructure/mailerlite';
 
 // Mocks
 const mockDb = {} as DrizzleClient; // DB is opaque in service
@@ -42,6 +44,9 @@ const mockOAuthLink = {
 
 const mockApple = { verifyIdToken: vi.fn() } as unknown as Mocked<AppleVerifier>;
 const mockGoogle = { verifyIdToken: vi.fn() } as unknown as Mocked<GoogleVerifier>;
+const mockMailerLiteClient = {
+  addSubscriber: vi.fn().mockResolvedValue(undefined),
+} as unknown as Mocked<MailerLiteClient>;
 const mockLogger = { error: vi.fn(), info: vi.fn() } as unknown as Mocked<Logger>;
 
 describe('UserAuthFlowService', () => {
@@ -58,6 +63,7 @@ describe('UserAuthFlowService', () => {
       mockOAuthLink,
       mockApple,
       mockGoogle,
+      mockMailerLiteClient,
       mockLogger
     );
   });
@@ -92,12 +98,9 @@ describe('UserAuthFlowService', () => {
     });
 
     it('should return success without sending code if registration requested for existing user', async () => {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       vi.spyOn(mockUserRepository, 'findByEmailCaseInsensitive').mockResolvedValue({
         id: 1,
-      } as any);
+      } as User);
 
       const result = await service.sendVerificationCode({
         identifier: 'test@example.com',
@@ -113,11 +116,9 @@ describe('UserAuthFlowService', () => {
     });
 
     it('should send email code for valid login request', async () => {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       vi.spyOn(mockUserRepository, 'findByEmailCaseInsensitive').mockResolvedValue({
         id: 1,
-      } as any);
+      } as User);
       mockTwilio.sendEmailVerification.mockResolvedValue(true);
 
       const result = await service.sendVerificationCode({
@@ -151,11 +152,9 @@ describe('UserAuthFlowService', () => {
 
     it('should login existing user successfully', async () => {
       mockTwilio.verifyCode.mockResolvedValue(true);
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       vi.spyOn(mockUserRepository, 'findByEmailCaseInsensitive').mockResolvedValue({
         id: 1,
-      } as any);
+      } as User);
       mockSessionTokenService.issueTokens.mockResolvedValue({
         accessToken: 'access',
         refreshToken: 'refresh',
@@ -177,8 +176,7 @@ describe('UserAuthFlowService', () => {
     it('should register new user successfully', async () => {
       mockTwilio.verifyCode.mockResolvedValue(true);
       vi.spyOn(mockUserRepository, 'findByEmailCaseInsensitive').mockResolvedValue(null);
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      vi.spyOn(mockUserRepository, 'create').mockResolvedValue({ id: 2 } as any);
+      vi.spyOn(mockUserRepository, 'create').mockResolvedValue({ id: 2 } as User);
       mockSessionTokenService.issueTokens.mockResolvedValue({
         accessToken: 'access',
         refreshToken: 'refresh',

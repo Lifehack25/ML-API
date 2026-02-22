@@ -16,6 +16,7 @@ import type {
 } from './dtos/users';
 import { SessionTokenService } from './session-token-service';
 import type { OAuthUserInfo, OAuthUserLinkService } from './oauth-user-link-service';
+import type { MailerLiteClient } from '../infrastructure/mailerlite';
 
 const normalizeEmail = (email: string) => email.trim().toLowerCase();
 
@@ -45,6 +46,7 @@ export class UserAuthFlowService {
     private readonly oauthUserLinkService: OAuthUserLinkService,
     private readonly appleVerifier: AppleVerifier,
     private readonly googleVerifier: GoogleVerifier,
+    private readonly mailerLiteClient: MailerLiteClient | null,
     private readonly logger: Logger
   ) {}
 
@@ -236,6 +238,14 @@ export class UserAuthFlowService {
           phoneVerified: request.isEmail ? undefined : true,
           context: 'Registration',
         });
+
+        // Add to MailerLite if email is provided
+        if (request.isEmail && created.email && this.mailerLiteClient) {
+          const groupId = '180116868106814872';
+          this.mailerLiteClient.addSubscriber(created.email, created.name, groupId).catch((e) => {
+            this.logger.error('Failed to add user to MailerLite', { error: String(e) });
+          });
+        }
 
         return success(tokens, 'Registration successful');
       } catch (dbError) {

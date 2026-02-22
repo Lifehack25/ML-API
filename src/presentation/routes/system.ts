@@ -45,7 +45,7 @@ export const createSystemRoutes = () => {
         },
         200
       );
-    } catch (error) {
+    } catch {
       return c.json(
         {
           error: 'Database connectivity check failed',

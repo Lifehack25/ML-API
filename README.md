@@ -22,7 +22,7 @@ Scan the QR code to see a **Memory Locks Web Album** example, populated with med
 -   **Clean Architecture**: Separation of concerns into Presentation, Service, Data, and Infrastructure layers.
 -   **Robust Data Layer**: Uses Cloudflare D1 (SQLite) with Drizzle ORM for type-safe database interactions.
 -   **Media Handling**: Integration with Cloudflare Images and Streams.
--   **Idempotency**: Built-in idempotency mechanisms using Cloudflare KV.
+-   **Idempotency**: Built-in idempotency mechanisms using Cloudflare D1.
 -   **Testing**: Comprehensive unit testing with Vitest.
 
 ## 🛠 Tech Stack

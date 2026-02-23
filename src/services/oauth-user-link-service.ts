@@ -20,7 +20,7 @@ export class OAuthUserLinkService {
     private readonly userRepository: UserRepository,
     private readonly mailerLiteClient: MailerLiteClient | null,
     private readonly logger: Logger
-  ) { }
+  ) {}
 
   async findOrCreate(info: OAuthUserInfo, executionCtx?: ExecutionContext): Promise<number> {
     // Step 1: try provider mapping

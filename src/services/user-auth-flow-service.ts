@@ -48,7 +48,7 @@ export class UserAuthFlowService {
     private readonly googleVerifier: GoogleVerifier,
     private readonly mailerLiteClient: MailerLiteClient | null,
     private readonly logger: Logger
-  ) { }
+  ) {}
 
   private ensureTwilio(): TwilioVerifyClient {
     if (!this.twilioClient) {
@@ -245,9 +245,11 @@ export class UserAuthFlowService {
         // Add to MailerLite if email is provided
         if (request.isEmail && created.email && this.mailerLiteClient) {
           const groupId = '180116868106814872';
-          const promise = this.mailerLiteClient.addSubscriber(created.email, created.name, groupId).catch((e) => {
-            this.logger.error('Failed to add user to MailerLite', { error: String(e) });
-          });
+          const promise = this.mailerLiteClient
+            .addSubscriber(created.email, created.name, groupId)
+            .catch((e) => {
+              this.logger.error('Failed to add user to MailerLite', { error: String(e) });
+            });
 
           if (executionCtx) {
             executionCtx.waitUntil(promise);

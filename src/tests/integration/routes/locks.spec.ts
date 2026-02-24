@@ -14,6 +14,7 @@ vi.mock('../../../infrastructure/cache-invalidation', () => ({
 const mockLockService = {
   connectLockToUser: vi.fn(),
   toggleSealDate: vi.fn(),
+  unsealLock: vi.fn(),
   publishMetadata: vi.fn(),
   uploadSingleMedia: vi.fn(),
   getValidationData: vi.fn(),
@@ -161,6 +162,60 @@ describe('Lock Routes Integration', () => {
       // 2. Request
       const response = await app.request(
         '/locks/99/seal',
+        {
+          method: 'PATCH',
+          headers: { Authorization: `Bearer ${token}` },
+        },
+        {},
+        executionCtx
+      );
+
+      expect(response.status).toBe(404);
+    });
+  });
+
+  describe('PATCH /locks/:lockId/unseal', () => {
+    it('should unseal lock if owned by user', async () => {
+      mockLockRepository.findById.mockResolvedValue({ id: 99, user_id: 123 });
+      mockLockService.unsealLock.mockResolvedValue(success({ id: 99, seal_date: null }));
+
+      const response = await app.request(
+        '/locks/99/unseal',
+        {
+          method: 'PATCH',
+          headers: { Authorization: `Bearer ${token}` },
+        },
+        {},
+        executionCtx
+      );
+
+      expect(response.status).toBe(200);
+      expect(mockLockRepository.findById).toHaveBeenCalledWith(99);
+      expect(mockLockService.unsealLock).toHaveBeenCalledWith(99);
+    });
+
+    it('should return 403 if user does not own lock', async () => {
+      mockLockRepository.findById.mockResolvedValue({ id: 99, user_id: 999 });
+
+      const response = await app.request(
+        '/locks/99/unseal',
+        {
+          method: 'PATCH',
+          headers: { Authorization: `Bearer ${token}` },
+        },
+        {},
+        executionCtx
+      );
+
+      expect(response.status).toBe(403);
+      expect(mockLockService.unsealLock).not.toHaveBeenCalled();
+    });
+
+    it('should return 404 if lock not found', async () => {
+      mockLockRepository.findById.mockResolvedValue(null);
+
+      const response = await app.request(
+        '/locks/99/unseal',
         {
           method: 'PATCH',
           headers: { Authorization: `Bearer ${token}` },

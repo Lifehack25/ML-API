@@ -92,6 +92,20 @@ export class LockService {
     );
   }
 
+  async unsealLock(lockId: number): Promise<ServiceResult<LockSummary>> {
+    const existing = await this.lockRepository.findById(lockId);
+    if (!existing) {
+      return failure('LOCK_NOT_FOUND', 'Lock not found', undefined, 404);
+    }
+
+    if (!existing.seal_date) {
+      return success(mapLockRowToSummary(existing, this.hashids), 'Lock already unsealed');
+    }
+
+    const updated = await this.lockRepository.update(lockId, { seal_date: null });
+    return success(mapLockRowToSummary(updated, this.hashids), 'Lock unsealed successfully');
+  }
+
   async updateGeoLocation(
     lockId: number,
     geoLocation: { lat: number; lng: number }

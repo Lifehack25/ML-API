@@ -132,6 +132,42 @@ describe('LockService', () => {
     });
   });
 
+  describe('unsealLock', () => {
+    it('should fail if lock not found', async () => {
+      mockLockRepo.findById.mockResolvedValue(null);
+      const result = await service.unsealLock(1);
+      if (result.ok) throw new Error('Expected failure');
+      expect(result.ok).toBe(false);
+      expect(result.error.code).toBe('LOCK_NOT_FOUND');
+    });
+
+    it('should be idempotent when lock is already unsealed', async () => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      mockLockRepo.findById.mockResolvedValue({ id: 1, seal_date: null } as any);
+
+      const result = await service.unsealLock(1);
+
+      if (!result.ok) throw new Error('Expected success');
+      expect(result.ok).toBe(true);
+      expect(result.message).toBe('Lock already unsealed');
+      expect(mockLockRepo.update).not.toHaveBeenCalled();
+    });
+
+    it('should clear seal_date when lock is sealed', async () => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      mockLockRepo.findById.mockResolvedValue({ id: 1, seal_date: '2023-01-01' } as any);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      mockLockRepo.update.mockResolvedValue({ id: 1, seal_date: null } as any);
+
+      const result = await service.unsealLock(1);
+
+      if (!result.ok) throw new Error('Expected success');
+      expect(result.ok).toBe(true);
+      expect(result.message).toBe('Lock unsealed successfully');
+      expect(mockLockRepo.update).toHaveBeenCalledWith(1, { seal_date: null });
+    });
+  });
+
   describe('updateGeoLocation', () => {
     it('should update geo location', async () => {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any

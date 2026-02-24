@@ -146,6 +146,41 @@ export const createLockRoutes = (config: AppConfig) => {
     }
   );
 
+  // Unseal a lock (idempotent).
+  router.patch(
+    '/:lockId{[0-9]+}/unseal',
+    jwtMiddleware,
+    attachUser,
+    requireNumericParam('lockId', { min: 1, message: 'Invalid lock ID' }),
+    async (c) => {
+      const { lockId } = c.req.valid('param') as { lockId: number };
+      const ownership = await ensureLockOwnership(c, lockId);
+      if (ownership !== true) {
+        return ownership;
+      }
+
+      const result = await getContainer(c).services.locks.unsealLock(lockId);
+
+      // Invalidate album cache immediately after successful unseal
+      if (result.ok) {
+        const container = getContainer(c);
+        const hashedId = container.hashids.encode(lockId);
+        await invalidateAlbumCache(hashedId);
+      }
+
+      if (result.ok) {
+        return c.json(result.data, result.status ?? 200);
+      }
+
+      const errorResponse: ApiError = {
+        error: result.error.message,
+        code: result.error.code,
+        details: result.error.details,
+      };
+      return c.json(errorResponse, result.status ?? 400);
+    }
+  );
+
   // Update geo location for a lock
   router.patch(
     '/:lockId{[0-9]+}/geo-location',

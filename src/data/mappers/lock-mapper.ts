@@ -28,5 +28,4 @@ export const mapLockRowToSummary = (row: Lock, hashids: HashIdHelper): LockSumma
   scanCount: row.scan_count,
   upgradedStorage: bool(row.upgraded_storage),
   geoLocation: parseGeoLocation(row.geo_location),
-  image: row.image ?? null,
 });

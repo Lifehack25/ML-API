@@ -9,9 +9,23 @@ export class MailerLiteClient {
     private readonly logger: Logger
   ) {}
 
-  async addSubscriber(email: string, name?: string | null, groupId?: string): Promise<void> {
+  async addSubscriber(
+    email: string,
+    name?: string | null,
+    groupId?: string,
+    origin?: string
+  ): Promise<void> {
     const url = `${this.baseUrl}/subscribers`;
     const groups = groupId ? [groupId] : undefined;
+    const fields: Record<string, string> = {};
+
+    if (name?.trim()) {
+      fields.name = name.trim();
+    }
+
+    if (origin?.trim()) {
+      fields.Origin = origin.trim();
+    }
 
     try {
       const response = await fetch(url, {
@@ -23,7 +37,7 @@ export class MailerLiteClient {
         },
         body: JSON.stringify({
           email,
-          fields: name ? { name } : undefined,
+          fields: Object.keys(fields).length > 0 ? fields : undefined,
           groups,
         }),
       });

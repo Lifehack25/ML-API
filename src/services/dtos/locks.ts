@@ -8,7 +8,6 @@ export interface LockSummary {
   scanCount: number;
   upgradedStorage: boolean;
   geoLocation: { lat: number; lng: number } | null;
-  image: string | null;
 }
 
 export interface LockConnectUserRequest {

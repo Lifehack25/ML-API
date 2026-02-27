@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { buildApp } from '../../../index';
 import { mockConfig } from '../../mocks';
-import { success } from '../../../common/result';
+import { failure, success } from '../../../common/result';
 import { sign } from 'hono/jwt';
 import { createLogger } from '../../../common/logger';
 
@@ -107,6 +107,39 @@ describe('Lock Routes Integration', () => {
         executionCtx
       );
       expect(response.status).toBe(400);
+    });
+
+    it('should return 409 when lock is already connected', async () => {
+      mockLockService.connectLockToUser.mockResolvedValue(
+        failure(
+          'LOCK_ALREADY_CONNECTED',
+          'This lock is already connected to another user.',
+          undefined,
+          409
+        )
+      );
+
+      const response = await app.request(
+        '/locks/connect/user',
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({ hashedLockId: 'valid-hash' }),
+        },
+        {},
+        executionCtx
+      );
+
+      expect(response.status).toBe(409);
+      expect(await response.json()).toEqual(
+        expect.objectContaining({
+          error: 'This lock is already connected to another user.',
+          code: 'LOCK_ALREADY_CONNECTED',
+        })
+      );
     });
   });
 

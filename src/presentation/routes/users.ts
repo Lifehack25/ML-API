@@ -257,7 +257,10 @@ export const createUserRoutes = (config: AppConfig) => {
     async (c) => {
       const userId = getUserId(c);
       const payload = c.req.valid('json') as Omit<VerifyIdentifierRequest, 'userId'>;
-      const result = await getService(c).services.users.verifyIdentifier({ ...payload, userId });
+      const result = await getService(c).services.users.verifyIdentifier(
+        { ...payload, userId },
+        c.executionCtx
+      );
       if (result.ok) {
         return c.json(result.data, result.status ?? 200);
       }

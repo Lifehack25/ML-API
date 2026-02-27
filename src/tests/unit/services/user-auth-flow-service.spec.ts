@@ -176,7 +176,11 @@ describe('UserAuthFlowService', () => {
     it('should register new user successfully', async () => {
       mockTwilio.verifyCode.mockResolvedValue(true);
       vi.spyOn(mockUserRepository, 'findByEmailCaseInsensitive').mockResolvedValue(null);
-      vi.spyOn(mockUserRepository, 'create').mockResolvedValue({ id: 2 } as User);
+      vi.spyOn(mockUserRepository, 'create').mockResolvedValue({
+        id: 2,
+        email: 'new@example.com',
+        name: 'New User',
+      } as User);
       mockSessionTokenService.issueTokens.mockResolvedValue({
         accessToken: 'access',
         refreshToken: 'refresh',
@@ -198,6 +202,12 @@ describe('UserAuthFlowService', () => {
           email: 'new@example.com',
           name: 'New User',
         })
+      );
+      expect(mockMailerLiteClient.addSubscriber).toHaveBeenCalledWith(
+        'new@example.com',
+        'New User',
+        '180116868106814872',
+        'App Registraion Page'
       );
     });
   });

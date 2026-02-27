@@ -146,6 +146,7 @@ export const createRequestContext = (
     mediaRepository,
     cleanupJobRepository,
     twilioClient,
+    mailerLiteClient,
     logger
   );
 

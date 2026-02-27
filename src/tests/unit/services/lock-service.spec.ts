@@ -73,6 +73,34 @@ describe('LockService', () => {
       expect(result.error.code).toBe('LOCK_NOT_FOUND');
     });
 
+    it('should fail if lock is already connected to the same user', async () => {
+      mockHashids.decode.mockReturnValue(123);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      mockLockRepo.findById.mockResolvedValue({ id: 123, user_id: 1 } as any);
+
+      const result = await service.connectLockToUser(1, 'valid-hash');
+      if (result.ok) throw new Error('Expected failure');
+      expect(result.ok).toBe(false);
+      expect(result.status).toBe(409);
+      expect(result.error.code).toBe('LOCK_ALREADY_CONNECTED');
+      expect(result.error.message).toBe('This lock is already connected to your account.');
+      expect(mockLockRepo.update).not.toHaveBeenCalled();
+    });
+
+    it('should fail if lock is already connected to another user', async () => {
+      mockHashids.decode.mockReturnValue(123);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      mockLockRepo.findById.mockResolvedValue({ id: 123, user_id: 2 } as any);
+
+      const result = await service.connectLockToUser(1, 'valid-hash');
+      if (result.ok) throw new Error('Expected failure');
+      expect(result.ok).toBe(false);
+      expect(result.status).toBe(409);
+      expect(result.error.code).toBe('LOCK_ALREADY_CONNECTED');
+      expect(result.error.message).toBe('This lock is already connected to another user.');
+      expect(mockLockRepo.update).not.toHaveBeenCalled();
+    });
+
     it('should successfully update user_id on lock', async () => {
       mockHashids.decode.mockReturnValue(123);
       // eslint-disable-next-line @typescript-eslint/no-explicit-any

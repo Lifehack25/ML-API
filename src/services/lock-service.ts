@@ -59,6 +59,14 @@ export class LockService {
       return failure('LOCK_NOT_FOUND', 'Lock not found', undefined, 404);
     }
 
+    if (lock.user_id != null) {
+      const message =
+        lock.user_id === userId
+          ? 'This lock is already connected to your account.'
+          : 'This lock is already connected to another user.';
+      return failure('LOCK_ALREADY_CONNECTED', message, undefined, 409);
+    }
+
     const updated = await this.lockRepository.update(lockId, { user_id: userId });
     return success(mapLockRowToSummary(updated, this.hashids), 'Lock connected successfully');
   }

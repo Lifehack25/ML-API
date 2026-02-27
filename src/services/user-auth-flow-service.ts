@@ -246,7 +246,7 @@ export class UserAuthFlowService {
         if (request.isEmail && created.email && this.mailerLiteClient) {
           const groupId = '180116868106814872';
           const promise = this.mailerLiteClient
-            .addSubscriber(created.email, created.name, groupId)
+            .addSubscriber(created.email, created.name, groupId, 'App Registraion Page')
             .catch((e) => {
               this.logger.error('Failed to add user to MailerLite', { error: String(e) });
             });

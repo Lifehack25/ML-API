@@ -16,6 +16,7 @@ import type {
   VerifyIdentifierRequest,
 } from './dtos/users';
 import { isTwilioRequestError, type TwilioVerifyClient } from '../infrastructure/Auth/twilio';
+import type { MailerLiteClient } from '../infrastructure/mailerlite';
 
 const sanitizePhone = (phone: string) => phone.replace(/\s+/g, '');
 const mapTwilioStatus = (status: number): 400 | 429 | 502 => {
@@ -32,6 +33,7 @@ export class UserService {
     private readonly mediaRepository: MediaObjectRepository,
     private readonly cleanupJobRepository: CleanupJobRepository,
     private readonly twilioClient: TwilioVerifyClient | null,
+    private readonly mailerLiteClient: MailerLiteClient | null,
     private readonly logger: Logger
   ) {}
 
@@ -81,7 +83,10 @@ export class UserService {
     return success(mapUserRowToProfile(updated), 'User name updated successfully');
   }
 
-  async verifyIdentifier(request: VerifyIdentifierRequest): Promise<ServiceResult<boolean>> {
+  async verifyIdentifier(
+    request: VerifyIdentifierRequest,
+    executionCtx?: ExecutionContext
+  ): Promise<ServiceResult<boolean>> {
     if (!request.identifier || !request.verifyCode) {
       return failure(
         'INVALID_REQUEST',
@@ -143,6 +148,22 @@ export class UserService {
           this.db.update(users).set({ email_verified: true }).where(eq(users.id, request.userId)),
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
         ] as any);
+
+        if (this.mailerLiteClient) {
+          const groupId = '180116868106814872';
+          const promise = this.mailerLiteClient
+            .addSubscriber(normalized, user.name, groupId, 'App Account Page')
+            .catch((e) => {
+              this.logger.error('Failed to add account-page email to MailerLite', {
+                userId: request.userId,
+                error: String(e),
+              });
+            });
+
+          if (executionCtx) {
+            executionCtx.waitUntil(promise);
+          }
+        }
       } else {
         const sanitized = sanitizePhone(identifier);
         const existingByPhone = await this.userRepository.findByPhoneNumber(sanitized);

@@ -23,7 +23,6 @@ export const locks = sqliteTable(
     }),
     upgraded_storage: integer('upgraded_storage').notNull().default(0), // 0=free, 1=tier1, 2=tier2
     geo_location: text('geo_location'),
-    image: text('image'), // Cover image URL
   },
   (table) => ({
     userIdIdx: index('idx_locks_user_id').on(table.user_id),

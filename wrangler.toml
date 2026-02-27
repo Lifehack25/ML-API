@@ -27,7 +27,6 @@ database_name = "ML-Database"
 database_id = "3afe1cf6-4d2c-4461-9b41-1c8e232e8361"
 migrations_dir = "drizzle/migrations"
 
-
 [images]
 binding = "IMAGES"
 

@@ -271,10 +271,10 @@
   }
 
   function getLockId() {
-    const urlParams = new URLSearchParams(window.location.search);
-    let lockId = urlParams.get('id');
+    const pathSegments = window.location.pathname.split('/').filter(Boolean);
+    let lockId = pathSegments.length > 0 ? pathSegments[0] : null;
 
-    // If the URL param is valid, store it safely
+    // If the path segment is valid, store it safely
     if (lockId && lockId !== 'null' && isValidLockId(lockId)) {
       safeLocalStorageSetItem('lockId', lockId);
     } else {

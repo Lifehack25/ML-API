@@ -16,7 +16,6 @@ const ALBUM_HOST = 'album.memorylocks.com';
 export const createWebAlbumRoutes = () => {
   const router = new Hono<{ Bindings: EnvBindings; Variables: AppVariables }>();
 
-  // Serve album HTML with server-side rendered data
   router.get('/', async (c, next: Next) => {
     // Only handle requests for album.memorylocks.com
     const host = c.req.header('host');
@@ -24,18 +23,26 @@ export const createWebAlbumRoutes = () => {
       return await next();
     }
 
-    const lockId = c.req.query('id');
+    return c.json(
+      {
+        error: 'Album not found. Use a direct album URL ending with the hashed lock ID.',
+      } as ApiError,
+      404
+    );
+  });
+
+  // Serve album HTML with server-side rendered data
+  router.get('/:lockId{[A-Za-z0-9]{6,20}}', async (c, next: Next) => {
+    // Only handle requests for album.memorylocks.com
+    const host = c.req.header('host');
+    if (host !== ALBUM_HOST) {
+      return await next();
+    }
+
+    const lockId = c.req.param('lockId');
     const isOwner = c.req.query('isOwner') === 'true';
     const container = getContainer(c);
     const ctx = c.get('executionCtx');
-
-    // Validate lockId
-    if (!lockId) {
-      return c.json(
-        { error: 'Album ID is required. Please provide ?id=YOUR_ALBUM_ID' } as ApiError,
-        400
-      );
-    }
 
     // Check local datacenter cache first
     const cache = caches.default;

@@ -33,7 +33,7 @@ export const injectAlbumHtml = ({
     <link rel="apple-touch-icon" href="${FAVICON_URL}">
     <meta property="og:title" content="${pageTitle}">
     <meta property="og:type" content="website">
-    <meta property="og:url" content="https://album.memorylocks.com/?id=${lockId}">
+    <meta property="og:url" content="https://album.memorylocks.com/${lockId}">
     <meta property="og:description" content="View your Memory Locks photo album">
     ${
       mainImageUrl

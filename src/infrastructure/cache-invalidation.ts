@@ -7,8 +7,8 @@
  */
 export async function invalidateAlbumCache(hashedId: string): Promise<void> {
   const urls = [
-    `https://album.memorylocks.com/?id=${hashedId}`,
-    `https://album.memorylocks.com/?id=${hashedId}&isOwner=true`,
+    `https://album.memorylocks.com/${hashedId}`,
+    `https://album.memorylocks.com/${hashedId}?isOwner=true`,
   ];
 
   // eslint-disable-next-line no-console

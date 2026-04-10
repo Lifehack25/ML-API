@@ -1,5 +1,16 @@
 import { AlbumResponse } from '../../services/dtos/albums';
 
+const escapeHtmlAttr = (str: string): string =>
+  str
+    .replace(/&/g, '&amp;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
+
+const safeJsonForScript = (obj: unknown): string =>
+  JSON.stringify(obj).replace(/</g, '\\u003c').replace(/>/g, '\\u003e').replace(/&/g, '\\u0026');
+
 interface HtmlInjectionOptions {
   html: string;
   lockId: string;
@@ -24,8 +35,8 @@ export const injectAlbumHtml = ({
 
   // Extract main image URL for Open Graph tags
   const mainImage = albumData?.Media.find((m) => m.IsMainImage);
-  const mainImageUrl = mainImage?.Url || null;
-  const pageTitle = albumData?.AlbumTitle || 'Memory Locks Album';
+  const mainImageUrl = mainImage?.Url ? escapeHtmlAttr(mainImage.Url) : null;
+  const pageTitle = escapeHtmlAttr(albumData?.AlbumTitle || 'Memory Locks Album');
 
   // Generate Open Graph and Twitter Card meta tags
   const metaTags = `
@@ -51,7 +62,7 @@ export const injectAlbumHtml = ({
   const albumDataScript = albumData
     ? `
     <script>
-      window.ALBUM_DATA = ${JSON.stringify(albumData)};
+      window.ALBUM_DATA = ${safeJsonForScript(albumData)};
       window.IS_OWNER = ${isOwner};
     </script>`
     : `

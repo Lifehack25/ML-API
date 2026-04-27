@@ -1,7 +1,6 @@
 import { TwilioConfig } from '../../config/env';
 
 export interface TwilioVerifyClient {
-  sendEmailVerification(to: string): Promise<boolean>;
   sendSmsVerification(to: string): Promise<boolean>;
   verifyCode(to: string, code: string): Promise<boolean>;
 }
@@ -100,7 +99,6 @@ export const createTwilioVerifyClient = (config: TwilioConfig): TwilioVerifyClie
   };
 
   return {
-    sendEmailVerification: (to) => sendVerification(to, 'email'),
     sendSmsVerification: (to) => sendVerification(to, 'sms'),
     verifyCode: async (to, code) => {
       const response = await request('/VerificationCheck', {

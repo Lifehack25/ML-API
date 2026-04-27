@@ -2,6 +2,8 @@ export interface EnvBindings {
   DB: D1Database;
   ASSETS: Fetcher;
   IMAGES: ImagesBinding;
+  OTP_CODES: KVNamespace;
+  MAILER: SendEmail;
   CREATE_LOCK_API_KEY: string;
   PUSH_NOTIFICATION_KEY: string;
   HASHIDS_SALT: string;

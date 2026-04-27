@@ -3,6 +3,7 @@ import type { EnvBindings } from './bindings';
 import { createHashIdHelper } from './hashids';
 import { loadConfig, type AppConfig } from '../config/env';
 import { createTwilioVerifyClient } from '../infrastructure/Auth/twilio';
+import { createEmailOtpClient } from '../infrastructure/Auth/email-otp';
 import { createSightengineClient } from '../infrastructure/sightengine';
 import { createCloudflareMediaClient } from '../infrastructure/cloudflare-media';
 import { createFirebaseMessagingClient } from '../infrastructure/firebase';
@@ -67,6 +68,7 @@ export const createRequestContext = (
   const logger = createLogger(requestId);
 
   const twilioClient = config.twilio ? createTwilioVerifyClient(config.twilio) : null;
+  const emailOtpClient = createEmailOtpClient(env.OTP_CODES, env.MAILER);
   const sightengineClient = createSightengineClient(config.sightengine, env.IMAGES);
   const cloudflareClient = createCloudflareMediaClient(config.cloudflareMedia);
   const firebaseClient = createFirebaseMessagingClient(config.firebase);
@@ -130,6 +132,7 @@ export const createRequestContext = (
     db,
     userRepository,
     twilioClient,
+    emailOtpClient,
     jwtService,
     sessionTokenService,
     oauthUserLinkService,
@@ -146,6 +149,7 @@ export const createRequestContext = (
     mediaRepository,
     cleanupJobRepository,
     twilioClient,
+    emailOtpClient,
     mailerLiteClient,
     logger
   );

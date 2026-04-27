@@ -27,6 +27,13 @@ database_name = "ML-Database"
 database_id = "3afe1cf6-4d2c-4461-9b41-1c8e232e8361"
 migrations_dir = "drizzle/migrations"
 
+[[kv_namespaces]]
+binding = "OTP_CODES"
+id = "83fc7a23d4a04efbb7bfa6eeae230f42"
+
+[[send_email]]
+name = "MAILER"
+
 [images]
 binding = "IMAGES"
 

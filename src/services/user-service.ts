@@ -16,6 +16,7 @@ import type {
   VerifyIdentifierRequest,
 } from './dtos/users';
 import { isTwilioRequestError, type TwilioVerifyClient } from '../infrastructure/Auth/twilio';
+import type { EmailOtpClient } from '../infrastructure/Auth/email-otp';
 import type { MailerLiteClient } from '../infrastructure/mailerlite';
 
 const sanitizePhone = (phone: string) => phone.replace(/\s+/g, '');
@@ -33,6 +34,7 @@ export class UserService {
     private readonly mediaRepository: MediaObjectRepository,
     private readonly cleanupJobRepository: CleanupJobRepository,
     private readonly twilioClient: TwilioVerifyClient | null,
+    private readonly emailOtpClient: EmailOtpClient,
     private readonly mailerLiteClient: MailerLiteClient | null,
     private readonly logger: Logger
   ) {}
@@ -101,17 +103,22 @@ export class UserService {
       return failure('USER_NOT_FOUND', 'User not found', undefined, 404);
     }
 
-    const twilio = this.ensureTwilio();
     const identifier = request.identifier.trim();
     let verified = false;
 
     try {
-      verified = await twilio.verifyCode(identifier, request.verifyCode);
+      if (request.isEmail) {
+        verified = await this.emailOtpClient.verifyCode(identifier, request.verifyCode);
+      } else {
+        const twilio = this.ensureTwilio();
+        verified = await twilio.verifyCode(identifier, request.verifyCode);
+      }
+
       if (!verified) {
         return failure('INVALID_CODE', 'Invalid verification code', undefined, 400);
       }
     } catch (error) {
-      if (isTwilioRequestError(error)) {
+      if (!request.isEmail && isTwilioRequestError(error)) {
         this.logger.error('Twilio verification check failed', {
           httpStatus: error.httpStatus,
           twilioCode: error.twilioCode,
@@ -129,8 +136,13 @@ export class UserService {
         );
       }
 
-      this.logger.error('Twilio verification check failed', { error: String(error) });
-      return failure('TWILIO_ERROR', 'Failed to verify code', undefined, 502);
+      this.logger.error('Verification check failed', { error: String(error) });
+      return failure(
+        request.isEmail ? 'EMAIL_OTP_ERROR' : 'TWILIO_ERROR',
+        'Failed to verify code',
+        undefined,
+        502
+      );
     }
 
     try {
@@ -344,16 +356,22 @@ export class UserService {
     }
 
     try {
-      const twilio = this.ensureTwilio();
-      const sent = isEmail
-        ? await twilio.sendEmailVerification(identifier)
-        : await twilio.sendSmsVerification(identifier);
-      if (!sent) {
-        return failure('TWILIO_ERROR', 'Failed to send verification code', undefined, 502);
+      if (isEmail) {
+        const sent = await this.emailOtpClient.sendCode(identifier);
+        if (!sent) {
+          return failure('EMAIL_OTP_ERROR', 'Failed to send verification code', undefined, 502);
+        }
+      } else {
+        const twilio = this.ensureTwilio();
+        const sent = await twilio.sendSmsVerification(identifier);
+        if (!sent) {
+          return failure('TWILIO_ERROR', 'Failed to send verification code', undefined, 502);
+        }
       }
+
       return success(true, 'Verification code sent');
     } catch (error) {
-      if (isTwilioRequestError(error)) {
+      if (!isEmail && isTwilioRequestError(error)) {
         this.logger.error('Resend verification failed', {
           httpStatus: error.httpStatus,
           twilioCode: error.twilioCode,
@@ -372,7 +390,12 @@ export class UserService {
       }
 
       this.logger.error('Resend verification failed', { error: String(error) });
-      return failure('TWILIO_ERROR', 'Failed to send verification code', undefined, 502);
+      return failure(
+        isEmail ? 'EMAIL_OTP_ERROR' : 'TWILIO_ERROR',
+        'Failed to send verification code',
+        undefined,
+        502
+      );
     }
   }
 }

@@ -11,6 +11,7 @@ import type { DrizzleClient } from '../../../data/db';
 import type { Logger } from '../../../common/logger';
 import type { User } from '../../../data/schema';
 import type { MailerLiteClient } from '../../../infrastructure/mailerlite';
+import type { EmailOtpClient } from '../../../infrastructure/Auth/email-otp';
 
 // Mocks
 const mockDb = {} as DrizzleClient; // DB is opaque in service
@@ -22,10 +23,14 @@ const mockUserRepository = {
 } as unknown as Mocked<UserRepository>;
 
 const mockTwilio = {
-  sendEmailVerification: vi.fn(),
   sendSmsVerification: vi.fn(),
   verifyCode: vi.fn(),
 } as unknown as Mocked<TwilioVerifyClient>;
+
+const mockEmailOtp = {
+  sendCode: vi.fn(),
+  verifyCode: vi.fn(),
+} as unknown as Mocked<EmailOtpClient>;
 
 const mockJwtService = {
   validateRefreshToken: vi.fn(),
@@ -58,6 +63,7 @@ describe('UserAuthFlowService', () => {
       mockDb,
       mockUserRepository,
       mockTwilio,
+      mockEmailOtp,
       mockJwtService,
       mockSessionTokenService,
       mockOAuthLink,
@@ -94,7 +100,7 @@ describe('UserAuthFlowService', () => {
 
       expect(result.ok).toBe(true);
       expect(result.message).toBe('User not found');
-      expect(mockTwilio.sendEmailVerification).not.toHaveBeenCalled();
+      expect(mockEmailOtp.sendCode).not.toHaveBeenCalled();
     });
 
     it('should return success without sending code if registration requested for existing user', async () => {
@@ -112,14 +118,14 @@ describe('UserAuthFlowService', () => {
 
       expect(result.ok).toBe(true);
       expect(result.message).toBe('User already exists');
-      expect(mockTwilio.sendEmailVerification).not.toHaveBeenCalled();
+      expect(mockEmailOtp.sendCode).not.toHaveBeenCalled();
     });
 
     it('should send email code for valid login request', async () => {
       vi.spyOn(mockUserRepository, 'findByEmailCaseInsensitive').mockResolvedValue({
         id: 1,
       } as User);
-      mockTwilio.sendEmailVerification.mockResolvedValue(true);
+      mockEmailOtp.sendCode.mockResolvedValue(true);
 
       const result = await service.sendVerificationCode({
         identifier: 'test@example.com',
@@ -130,13 +136,13 @@ describe('UserAuthFlowService', () => {
       if (!result.ok) throw new Error('Expected success');
 
       expect(result.ok).toBe(true);
-      expect(mockTwilio.sendEmailVerification).toHaveBeenCalledWith('test@example.com');
+      expect(mockEmailOtp.sendCode).toHaveBeenCalledWith('test@example.com');
     });
   });
 
   describe('verifyCode', () => {
     it('should fail if code is invalid', async () => {
-      mockTwilio.verifyCode.mockResolvedValue(false);
+      mockEmailOtp.verifyCode.mockResolvedValue(false);
 
       const result = await service.verifyCode({
         identifier: 'test@example.com',
@@ -151,7 +157,7 @@ describe('UserAuthFlowService', () => {
     });
 
     it('should login existing user successfully', async () => {
-      mockTwilio.verifyCode.mockResolvedValue(true);
+      mockEmailOtp.verifyCode.mockResolvedValue(true);
       vi.spyOn(mockUserRepository, 'findByEmailCaseInsensitive').mockResolvedValue({
         id: 1,
       } as User);
@@ -174,7 +180,7 @@ describe('UserAuthFlowService', () => {
     });
 
     it('should register new user successfully', async () => {
-      mockTwilio.verifyCode.mockResolvedValue(true);
+      mockEmailOtp.verifyCode.mockResolvedValue(true);
       vi.spyOn(mockUserRepository, 'findByEmailCaseInsensitive').mockResolvedValue(null);
       vi.spyOn(mockUserRepository, 'create').mockResolvedValue({
         id: 2,

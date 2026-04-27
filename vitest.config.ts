@@ -1,6 +1,12 @@
 import { defineConfig } from 'vitest/config';
+import path from 'path';
 
 export default defineConfig({
+    resolve: {
+        alias: {
+            'cloudflare:email': path.resolve(__dirname, 'src/tests/__mocks__/cloudflare-email.ts'),
+        },
+    },
     test: {
         globals: true,
         environment: 'node',
